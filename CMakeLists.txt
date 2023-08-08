@@ -3,7 +3,7 @@ project (asio-example CXX)
 
 find_package(ASIO 1.28.1 REQUIRED)
 
-add_executable(asio-server src/asio-example.cpp)
+add_executable(asio-server src/asio-server.cpp)
 target_link_libraries(asio-server PRIVATE asio::asio)
 
 add_executable(asio-client src/asio-client.cpp)
