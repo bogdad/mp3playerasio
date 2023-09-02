@@ -1,6 +1,8 @@
 #include <asio.hpp>
+#include <asio/detail/socket_ops.hpp>
 #include <asio/error.hpp>
 #include <asio/registered_buffer.hpp>
+#include <absl/strings/escaping.h>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -26,13 +28,15 @@ int main(int argc, char *argv[]) {
     for (;;) {
       std::array<char, 128> buf{};
       asio::error_code error;
-
+      
       size_t len = socket.read_some(asio::buffer(buf), error);
       if (error == asio::error::eof) {
         std::cout << "eof!" << std::endl;
         break;
       }
-      std::cout << "finished reading " << std::string_view(buf.data(), len) << std::endl;
+      std::string encoded;
+      absl::Base64Escape(absl::string_view(buf.data(), len), &encoded);
+      std::cout << "finished reading " << encoded << std::endl;
       if (error)
         throw asio::system_error(error); // Some other error.
       int rand_delay = std::rand() % 15;

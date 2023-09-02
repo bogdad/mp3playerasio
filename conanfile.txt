@@ -1,5 +1,6 @@
 [requires]
 asio/1.28.1
+abseil/20230125.3
 [generators]
 CMakeDeps
 CMakeToolchain
