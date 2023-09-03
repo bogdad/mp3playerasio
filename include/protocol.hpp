@@ -58,7 +58,7 @@ struct Envelope {
 };
 
 enum class HandlerState {
-	before_envelope,
+	before_envelope = 0,
 	have_envelope
 };
 

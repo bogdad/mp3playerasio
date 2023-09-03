@@ -63,6 +63,7 @@ bool Handler::try_read(State &state) {
       _envelope.message_type = state.peek_int();
       _envelope.message_size = state.peek_int();
       _state = HandlerState::have_envelope;
+      LOG(INFO) << "Handle::try_read state " << (int)_state;
       return try_read(state);
     } else {
       return false;
