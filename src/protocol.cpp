@@ -1,13 +1,15 @@
 #include "protocol.hpp"
 #include <absl/log/log.h>
+#include <asio/buffer.hpp>
 #include <cstring>
 #include <exception>
+#include <span>
 #include <string_view>
 
 void State::check(int len, std::string_view method) const {
   if (_curr + len >= _last_written) {
     LOG(ERROR) << "State cant " << method << ": bumped into buffer size "
-               << _curr << " / " << _buff.size();
+               << _curr << " / " << cbuff().size();
     std::terminate();
   }
 }
@@ -15,7 +17,7 @@ void State::check(int len, std::string_view method) const {
 int State::peek_int() const {
   check(4, "peek_int");
   int ret;
-  std::memcpy(&ret, _buff.data() + _curr, sizeof(ret));
+  std::memcpy(&ret, cbuff().data() + _curr, sizeof(ret));
   return ret;
 }
 
@@ -23,15 +25,35 @@ int State::nw() const { return _last_written - _curr; }
 
 std::string_view State::peek_string_view(int len) const {
   check(len, "peek_string_view");
-  return std::string_view(_buff.data() + _curr, len);
+  return std::string_view(cbuff().data() + _curr, len);
 }
 
 bytes_view State::peek_span(int len) const {
   check(len, "peek_span");
-  return peek_string_view(len);
+  return cbuff().subspan(_curr, len);
 }
 
 void State::skip_len(int len) { _curr += len; }
+
+asio::mutable_buffer State::next_buffer() {
+	auto buf = buff();
+	auto ret = asio::mutable_buffer((char *)buf.data() + _last_written, buf.size() - _last_written);
+	return ret;
+}
+
+void State::advance_buffer(int len) {
+	_last_written += len;
+}
+
+std::span<char> State::buff() {
+	if (_cur_buffer != 0) return _buff1;
+	return _buff0;
+}
+
+std::span<const char> State::cbuff() const {
+	if (_cur_buffer != 0) return _buff1;
+	return _buff0;
+}
 
 bool Handler::try_read(State &state) {
   if (_state == HandlerState::before_envelope) {

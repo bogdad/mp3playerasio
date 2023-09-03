@@ -27,7 +27,7 @@ void ClientHandler::try_read_client(State &state) {
         if (state.nw() >= _song_envelope.song_size) {
           _on_mp3_bytes(state.peek_span(_song_envelope.song_size));
           state.skip_len(_song_envelope.song_size);
-          state.reset();
+          reset();
           try_read_client(state);
         }
       }

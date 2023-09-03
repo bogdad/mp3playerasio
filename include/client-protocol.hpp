@@ -11,7 +11,7 @@
 using mutable_buffers = std::vector<asio::mutable_buffer>;
 using const_buffers = std::vector<asio::const_buffer>;
 
-using bytes_view = std::string_view;
+using bytes_view = std::span<const char>;
 
 
 struct SongEnvelope {
@@ -33,8 +33,8 @@ struct ClientHandler : Handler {
   void try_read_client(State &state);
   void client_reset();
 
-  absl::AnyInvocable<void(std::string_view)> _on_time;
   ClientHandlerState _song_handler_state{};
   SongEnvelope _song_envelope{};
+  absl::AnyInvocable<void(std::string_view)> _on_time;
   absl::AnyInvocable<void(bytes_view)> _on_mp3_bytes;
 };
