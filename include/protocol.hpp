@@ -13,18 +13,18 @@ using const_buffers = std::vector<asio::const_buffer>;
 using bytes_view = std::string_view;
 
 struct State {
-	int nw() const;
-	int peek_int() const;
-	std::string_view peek_string_view(int len) const;
-	bytes_view peek_span(int len) const;
+  int nw() const;
+  int peek_int() const;
+  std::string_view peek_string_view(int len) const;
+  bytes_view peek_span(int len) const;
 
-	void skip_len(int len);
+  void skip_len(int len);
 
-	void check(int len, std::string_view method) const;
+  void check(int len, std::string_view method) const;
 
-	std::array<char, 1024> _buff;
-	int _curr;
-	int _last_written;
+  std::array<char, 1024> _buff;
+  int _curr;
+  int _last_written;
 };
 
 struct Envelope {
