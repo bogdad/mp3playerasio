@@ -1,12 +1,13 @@
 cmake_minimum_required (VERSION 3.15)
 project (asio-example CXX)
+set(CMAKE_CXX_STANDARD 20)
 
 find_package(asio 1.28.1 REQUIRED)
 find_package(absl REQUIRED)
 
 add_library(protocol src/protocol.cpp)
 target_include_directories(protocol PUBLIC include)
-target_link_libraries(protocol PRIVATE asio::asio absl::any_invocable)
+target_link_libraries(protocol PRIVATE asio::asio absl::any_invocable absl::log)
 
 add_library(mp3 src/mp3.cpp)
 target_include_directories(mp3 PUBLIC include)

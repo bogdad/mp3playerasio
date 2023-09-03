@@ -13,15 +13,18 @@ using const_buffers = std::vector<asio::const_buffer>;
 using bytes_view = std::string_view;
 
 struct State {
-	std::array<char, 1024> buff;
-	int curr;
-	int committed;
-	int nw();
-	int advance_int();
-	std::string_view peek_string_view();
-	bytes_view peek_span(int len);
-	void skip_message_size();
-	void reset();
+	int nw() const;
+	int peek_int() const;
+	std::string_view peek_string_view(int len) const;
+	bytes_view peek_span(int len) const;
+
+	void skip_len(int len);
+
+	void check(int len, std::string_view method) const;
+
+	std::array<char, 1024> _buff;
+	int _curr;
+	int _last_written;
 };
 
 struct Envelope {
@@ -38,21 +41,6 @@ struct Handler {
   HandlerState _state;
   Envelope _envelope;
 
-  bool try_read(State &state) {
-  	if (_state == HandlerState::before_envelope) {
-  		if (state.nw() >= sizeof(Envelope)) {
-  			// we can parse the envelope now
-  			_envelope.message_type = state.advance_int();
-  			_envelope.message_size = state.advance_int();
-  			_state = HandlerState::have_envelope;
-  			return try_read(state);
-  		} else {
-  			return false;
-  		}
-  	} else if (_state == HandlerState::have_envelope) {
-  		return true;
-  	} else {
-  		std::terminate();
-  	}
-  }
+  bool try_read(State &state);
+  void reset();
 };
