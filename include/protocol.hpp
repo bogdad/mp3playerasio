@@ -1,8 +1,8 @@
 #pragma once
 
+#include <absl/functional/any_invocable.h>
 #include <array>
 #include <asio.hpp>
-#include <absl/functional/any_invocable.h>
 #include <asio/buffer.hpp>
 #include <exception>
 #include <span>
@@ -21,7 +21,6 @@ server sends mp3
 
  */
 
-
 using mutable_buffers = std::vector<asio::mutable_buffer>;
 using const_buffers = std::vector<asio::const_buffer>;
 
@@ -29,7 +28,7 @@ using bytes_view = std::span<const char>;
 
 struct State {
 
-	// parsing part
+  // parsing part
   int nw() const;
   int peek_int() const;
   std::string_view peek_string_view(int len) const;

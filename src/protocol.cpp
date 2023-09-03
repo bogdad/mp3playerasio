@@ -36,23 +36,24 @@ bytes_view State::peek_span(int len) const {
 void State::skip_len(int len) { _curr += len; }
 
 asio::mutable_buffer State::next_buffer() {
-	auto buf = buff();
-	auto ret = asio::mutable_buffer((char *)buf.data() + _last_written, buf.size() - _last_written);
-	return ret;
+  auto buf = buff();
+  auto ret = asio::mutable_buffer((char *)buf.data() + _last_written,
+                                  buf.size() - _last_written);
+  return ret;
 }
 
-void State::advance_buffer(int len) {
-	_last_written += len;
-}
+void State::advance_buffer(int len) { _last_written += len; }
 
 std::span<char> State::buff() {
-	if (_cur_buffer != 0) return _buff1;
-	return _buff0;
+  if (_cur_buffer != 0)
+    return _buff1;
+  return _buff0;
 }
 
 std::span<const char> State::cbuff() const {
-	if (_cur_buffer != 0) return _buff1;
-	return _buff0;
+  if (_cur_buffer != 0)
+    return _buff1;
+  return _buff0;
 }
 
 bool Handler::try_read(State &state) {

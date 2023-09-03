@@ -13,7 +13,6 @@ using const_buffers = std::vector<asio::const_buffer>;
 
 using bytes_view = std::span<const char>;
 
-
 struct SongEnvelope {
 	int song_size;
 	int chunks_left;

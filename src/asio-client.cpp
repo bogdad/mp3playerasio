@@ -29,9 +29,9 @@ int main(int argc, char *argv[]) {
     tcp::resolver::results_type endpoints = resolver.resolve(argv[1], "8060");
     tcp::socket socket(io_context);
     asio::connect(socket, endpoints);
-    State state {};
+    State state{};
 
-    auto on_time = [&socket](std::string_view ts){
+    auto on_time = [&socket](std::string_view ts) {
       LOG(INFO) << "time " << ts;
       int rand_delay = std::rand() % 15;
       std::cout << "sleeping for " << rand_delay << std::endl;
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
       }
       std::cout << "wrote " << nwrote << " of " << strstr << std::endl;
     };
-    auto on_mp3_bytes = [](bytes_view ts) { 
+    auto on_mp3_bytes = [](bytes_view ts) {
       std::string encoded;
       absl::Base64Escape(absl::string_view(ts.data(), ts.size()), &encoded);
       std::cout << "finished reading " << encoded << std::endl;
