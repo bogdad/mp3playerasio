@@ -6,76 +6,95 @@
 #include <span>
 #include <string_view>
 
-void State::check(int len, std::string_view method) const {
-  if (_curr + len >= _last_written) {
+void ReadBuffer::check(int len, std::string_view method) const {
+  if (_curr + len > _last_written) {
     LOG(ERROR) << "State cant " << method << ": bumped into buffer size "
-               << _curr << " / " << cbuff().size();
+               << _curr << " + " << len << " >= " << _last_written;
     std::terminate();
   }
 }
 
-int State::peek_int() const {
+int ReadBuffer::peek_int() const {
   check(4, "peek_int");
   int ret;
   std::memcpy(&ret, cbuff().data() + _curr, sizeof(ret));
   return ret;
 }
 
-int State::nw() const { return _last_written - _curr; }
+int ReadBuffer::nw() const { return _last_written - _curr; }
 
-std::string_view State::peek_string_view(int len) const {
+std::string_view ReadBuffer::peek_string_view(int len) const {
   check(len, "peek_string_view");
   return std::string_view(cbuff().data() + _curr, len);
 }
 
-bytes_view State::peek_span(int len) const {
+bytes_view ReadBuffer::peek_span(int len) const {
   check(len, "peek_span");
   return cbuff().subspan(_curr, len);
 }
 
-void State::skip_len(int len) { _curr += len; }
+void ReadBuffer::skip_len(int len) { _curr += len; }
 
-asio::mutable_buffer State::next_buffer() {
+asio::mutable_buffer ReadBuffer::next_buffer() {
   auto buf = buff();
   auto ret = asio::mutable_buffer((char *)buf.data() + _last_written,
                                   buf.size() - _last_written);
   return ret;
 }
 
-void State::advance_buffer(int len) { _last_written += len; }
+void ReadBuffer::advance_buffer(int len) { _last_written += len; }
 
-std::span<char> State::buff() {
+std::span<char> ReadBuffer::buff() {
   if (_cur_buffer != 0)
     return _buff1;
   return _buff0;
 }
 
-std::span<const char> State::cbuff() const {
+std::span<const char> ReadBuffer::cbuff() const {
   if (_cur_buffer != 0)
     return _buff1;
   return _buff0;
 }
 
-bool Handler::try_read(State &state) {
-  if (_state == HandlerState::before_envelope) {
+bool Decoder::try_read(ReadBuffer &state) {
+  if (_state == DecoderState::before_envelope) {
     if (state.nw() >= sizeof(Envelope)) {
       // we can parse the envelope now
       _envelope.message_type = state.peek_int();
+      state.skip_len(4);
       _envelope.message_size = state.peek_int();
-      _state = HandlerState::have_envelope;
-      LOG(INFO) << "Handle::try_read state " << (int)_state;
+      state.skip_len(4);
+      _state = DecoderState::have_envelope;
+      LOG(INFO) << "Handle::try_read state " << (int)_state
+                << " envelope, message_size " << _envelope.message_size
+                << " message_type " << _envelope.message_type;
       return try_read(state);
     } else {
       return false;
     }
-  } else if (_state == HandlerState::have_envelope) {
+  } else if (_state == DecoderState::have_envelope) {
     return true;
   } else {
     std::terminate();
   }
 }
 
-void Handler::reset() {
-  _state = HandlerState::before_envelope;
+void Decoder::reset() {
+  _state = DecoderState::before_envelope;
   _envelope = {};
+}
+
+void WriteBuffer::memcpy_in(const void *data, size_t sz) {
+  if (_last_written + sz >= _arr.size())
+    std::terminate();
+  std::memcpy(_arr.data() + _last_written, data, sz);
+  _last_written += sz;
+}
+
+asio::const_buffer WriteBuffer::as_buffer() const {
+  return asio::buffer(_arr.data(), _last_written);
+}
+
+void Encoder::fill_envelope(Envelope envelope, WriteBuffer &buff) {
+  buff.memcpy_in(&envelope, sizeof(envelope));
 }

@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     tcp::resolver::results_type endpoints = resolver.resolve(argv[1], "8060");
     tcp::socket socket(io_context);
     asio::connect(socket, endpoints);
-    State state{};
+    ReadBuffer state{};
 
     auto on_time = [&socket](std::string_view ts) {
       LOG(INFO) << "time " << ts;
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
       std::cout << "finished reading " << encoded << std::endl;
     };
 
-    ClientHandler handler(on_time, on_mp3_bytes);
+    ClientDecoder handler(on_time, on_mp3_bytes);
     for (;;) {
       asio::error_code error;
 

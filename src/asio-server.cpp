@@ -13,6 +13,8 @@
 #include <absl/base/thread_annotations.h>
 #include <absl/log/log.h>
 #include <absl/strings/str_format.h>
+#include <algorithm>
+#include <array>
 #include <asio.hpp>
 #include <asio/basic_streambuf.hpp>
 #include <asio/buffer.hpp>
@@ -33,8 +35,11 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <sys/socket.h>
 
 #include "mp3.hpp"
+#include "protocol.hpp"
+#include "server-protocol.hpp"
 
 using asio::ip::tcp;
 
@@ -72,9 +77,8 @@ public:
   typedef std::shared_ptr<tcp_connection> pointer;
 
   static pointer create(asio::io_context &io_context) {
-
-    mp3 file = mp3::create(fs::path(
-        "/Users/vladimir/Downloads/classical-triumphant-march-163852.mp3"));
+    LOG(INFO) << "creating file";
+    mp3 file = mp3::create(fs::path("./classical-triumphant-march-163852.mp3"));
 
     return pointer(new tcp_connection(io_context, std::move(file)),
                    [](tcp_connection *conn) {
@@ -87,7 +91,7 @@ public:
 
   void start() {
     asio::error_code ec;
-    handle_write_1(ec, 0);
+    send_date();
   }
 
 private:
@@ -99,18 +103,21 @@ private:
     message_ = make_daytime_string();
 
     auto ptr = shared_from_this();
+    _server_encoder.fill_time(message_, _write_buffer);
+
     asio::async_write(
-        socket_, asio::buffer(message_),
+        socket_, _write_buffer.as_buffer(),
         [ptr](const asio::error_code &error, size_t bytes_transferred) {
           ptr->handle_write_1(error, bytes_transferred);
         });
   }
 
-  void handle_write_1(const asio::error_code &error,
-                      size_t /*bytes_transferred*/) {
+  void send_mp3() {
+    _server_encoder.fill_mp3(_file, _write_buffer);
     if (_file.send_chunk(socket_) == 0) {
       if (_file.is_all_sent()) {
-        handle_write_2(error, 0);
+        asio::error_code ec{};
+        handle_write_2(ec, 0);
       } else {
         auto ptr = shared_from_this();
         socket_.async_write_some(
@@ -124,6 +131,11 @@ private:
       socket_.shutdown(asio::socket_base::shutdown_both);
       socket_.close();
     };
+  }
+
+  void handle_write_1(const asio::error_code &error,
+                      size_t /*bytes_transferred*/) {
+    send_mp3();
   }
 
   void handle_write_2(const asio::error_code &error,
@@ -170,6 +182,8 @@ private:
   bool was_timeout_{false};
 
   mp3 _file;
+  WriteBuffer _write_buffer;
+  ServerEncoder _server_encoder{};
 };
 
 class tcp_server {

@@ -50,6 +50,8 @@ int mp3::call_sendfile(const asio::ip::tcp::socket &socket, off_t &len) {
 
 bool mp3::is_all_sent() const { return _current._current == _current._size; }
 
+size_t mp3::size() const { return _size; }
+
 off_t file_view::len() { return _size - _current; }
 
 void file_view::consume(size_t l) {

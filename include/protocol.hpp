@@ -26,7 +26,7 @@ using const_buffers = std::vector<asio::const_buffer>;
 
 using bytes_view = std::span<const char>;
 
-struct State {
+struct ReadBuffer {
 
   // parsing part
   int nw() const;
@@ -53,19 +53,29 @@ struct State {
 };
 
 struct Envelope {
-	int message_type;
-	int message_size;
+  int message_type;
+  int message_size;
 };
 
-enum class HandlerState {
-	before_envelope = 0,
-	have_envelope
-};
+enum class DecoderState { before_envelope = 0, have_envelope };
 
-struct Handler {
-  HandlerState _state{};
+struct Decoder {
+  DecoderState _state{};
   Envelope _envelope{};
 
-  bool try_read(State &state);
+  bool try_read(ReadBuffer &state);
   void reset();
+};
+
+struct WriteBuffer {
+
+  void memcpy_in(const void *data, size_t sz);
+  asio::const_buffer as_buffer() const;
+
+  std::array<char, 2048> _arr{};
+  int _last_written{};
+};
+
+struct Encoder {
+  void fill_envelope(Envelope envelope, WriteBuffer &buff);
 };
