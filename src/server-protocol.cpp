@@ -24,7 +24,7 @@ void ServerDecoder::try_read_server(RingBuffer &state) {
 
 void ServerEncoder::fill_time(std::string_view time, RingBuffer &buff) {
   fill_envelope(Envelope{1, static_cast<int>(time.size())}, buff);
-  buff.memcpy_in((char *)time.data(), time.size());
+  buff.memcpy_in(static_cast<const char *>(time.data()), time.size());
 }
 
 void ServerEncoder::fill_mp3(mp3 &file, RingBuffer &buff) {

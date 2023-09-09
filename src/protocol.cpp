@@ -1,20 +1,19 @@
 #include "protocol.hpp"
 #include <absl/log/log.h>
 #include <asio/buffer.hpp>
+#include <cstddef>
 #include <cstring>
 #include <exception>
 #include <iterator>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
 
 namespace am {
 
-RingBuffer::RingBuffer(std::size_t size) : _size(size), _data(size) {
-  _filled_start = 0;
-  _filled_size = 0;
-  _non_filled_start = 0;
-  _non_filled_size = size;
+RingBuffer::RingBuffer(std::size_t size) : 
+_size(size), _data(size), _filled_start(0), _filled_size(0), _non_filled_start(0), _non_filled_size(size) {
 }
 
 void RingBuffer::reset() {
@@ -46,12 +45,12 @@ void RingBuffer::consume(std::size_t len) {
   }
 }
 
-void RingBuffer::memcpy_in(void *data, int sz) {
+void RingBuffer::memcpy_in(const void *data, size_t sz) {
   // std::memcpy(_arr.data() + _last_written, data, sz);
   auto left_to_the_right = _size - _non_filled_start;
   if (sz > left_to_the_right) {
     std::memcpy(&_data.at(_non_filled_start), data, left_to_the_right);
-    std::memcpy(_data.data(), ((char *)data) + left_to_the_right,
+    std::memcpy(_data.data(), static_cast<const char *>(data) + left_to_the_right,
                 sz - left_to_the_right);
   } else {
     std::memcpy(&_data.at(_non_filled_start), data, sz);
@@ -61,12 +60,12 @@ void RingBuffer::memcpy_in(void *data, int sz) {
 
 RingBuffer::const_buffers_type RingBuffer::data() const {
   if (_filled_size == 0)
-    return const_buffers_type();
+    return {};
   auto left_to_the_right = _size - _filled_start;
   if (_filled_size > left_to_the_right) {
-    return const_buffers_type(
+    return {
         asio::const_buffer(&_data.at(_filled_start), left_to_the_right),
-        asio::const_buffer(_data.data(), _filled_size - left_to_the_right));
+        asio::const_buffer(_data.data(), _filled_size - left_to_the_right)};
   }
   return const_buffers_type(
       asio::const_buffer(&_data.at(_filled_start), _filled_size));
@@ -74,13 +73,13 @@ RingBuffer::const_buffers_type RingBuffer::data() const {
 
 RingBuffer::const_buffers_type RingBuffer::data(std::size_t max_size) const {
   if (_filled_size == 0)
-    return const_buffers_type();
+    return {};
   auto buf_size = std::min(_filled_size, max_size);
   auto left_to_the_right = _size - _filled_start;
   if (buf_size > left_to_the_right) {
-    return const_buffers_type(
+    return {
         asio::const_buffer(&_data.at(_filled_start), left_to_the_right),
-        asio::const_buffer(_data.data(), buf_size - left_to_the_right));
+        asio::const_buffer(_data.data(), buf_size - left_to_the_right)};
   }
   return const_buffers_type(
       asio::const_buffer(&_data.at(_filled_start), buf_size));
@@ -88,15 +87,15 @@ RingBuffer::const_buffers_type RingBuffer::data(std::size_t max_size) const {
 
 RingBuffer::mutable_buffers_type RingBuffer::prepared() {
   if (_non_filled_size == 0) {
-    return mutable_buffers_type();
+    return {};
   }
   auto left_to_the_right = _size - _non_filled_start;
   if (_non_filled_size > left_to_the_right) {
     // we have 2 parts
-    return mutable_buffers_type(
+    return {        
         asio::mutable_buffer(&_data.at(_non_filled_start), left_to_the_right),
         asio::mutable_buffer(_data.data(),
-                             _non_filled_size - left_to_the_right));
+                             _non_filled_size - left_to_the_right)};
   }
   return mutable_buffers_type(
       asio::mutable_buffer(&_data.at(_non_filled_start), _non_filled_size));
@@ -104,14 +103,14 @@ RingBuffer::mutable_buffers_type RingBuffer::prepared() {
 
 RingBuffer::mutable_buffers_type RingBuffer::prepared(std::size_t max_size) {
   if (_non_filled_size == 0) {
-    return mutable_buffers_type();
+    return {};
   }
   auto buf_size = std::min(_non_filled_size, max_size);
   auto left_to_the_right = _size - _non_filled_start;
   if (buf_size > left_to_the_right) {
-    return mutable_buffers_type(
+    return {
         asio::mutable_buffer(&_data.at(_non_filled_start), left_to_the_right),
-        asio::mutable_buffer(_data.data(), buf_size - left_to_the_right));
+        asio::mutable_buffer(_data.data(), buf_size - left_to_the_right)};
   }
   return mutable_buffers_type(
       asio::mutable_buffer(&_data.at(_non_filled_start), buf_size));
@@ -136,13 +135,13 @@ inline char RingBuffer::char_at(std::size_t pos) const {
 }
 
 using raw_int = union {
-  char c[4];
+  std::array<char,4> c;
   int i;
 };
 
 int RingBuffer::peek_int() const {
   check(4, "peek_int");
-  int ret;
+  int ret = 0;
   if (_filled_size + 4 < _size) {
     std::memcpy(&ret, &_data.at(_filled_start), sizeof(ret));
   } else {
@@ -161,9 +160,9 @@ buffers_2<std::string_view> RingBuffer::peek_string_view(int len) const {
   check(len, "peek_string_view");
   auto left_to_the_right = _size - _filled_start;
   if (len > left_to_the_right) {
-    return buffers_2(
+    return {
         std::string_view(&_data.at(_filled_start), left_to_the_right),
-        std::string_view(_data.data(), len - left_to_the_right));
+        std::string_view(_data.data(), len - left_to_the_right)};
   } else {
     return buffers_2(std::string_view(&_data.at(_filled_start), len));
   }
@@ -173,8 +172,8 @@ buffers_2<std::span<const char>> RingBuffer::peek_span(int len) const {
   check(len, "peek_span");
   auto left_to_the_right = _size - _filled_start;
   if (len > left_to_the_right) {
-    return buffers_2(std::span(&_data.at(_filled_start), left_to_the_right),
-                     std::span(_data.data(), len - left_to_the_right));
+    return {std::span(&_data.at(_filled_start), left_to_the_right),
+                     std::span(_data.data(), len - left_to_the_right)};
   } else {
     return buffers_2(std::span(&_data.at(_filled_start), len));
   }

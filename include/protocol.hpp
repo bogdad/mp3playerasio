@@ -85,7 +85,7 @@ struct RingBuffer {
    */
   void consume(std::size_t size);
 
-  void memcpy_in(void *data, int sz);
+  void memcpy_in(const void *data, size_t sz);
 
   // non filled sequence for writes
   mutable_buffers_type prepared();

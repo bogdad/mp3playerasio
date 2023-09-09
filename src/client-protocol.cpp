@@ -29,6 +29,6 @@ void ClientDecoder::try_read_client(RingBuffer &state) {
 
 void ClientEncoder::fill_message(std::string_view msg, RingBuffer &buff) {
   fill_envelope(Envelope{3, static_cast<int>(msg.size())}, buff);
-  buff.memcpy_in((char *)msg.data(), msg.size());
+  buff.memcpy_in(static_cast<const char *>(msg.data()), msg.size());
 }
 } // namespace am

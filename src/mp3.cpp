@@ -13,7 +13,7 @@
 namespace am {
 
 mp3 mp3::create(fs::path filepath) {
-  printf("filepath %s\n", filepath.c_str());
+  LOG(INFO) << "filepath " << filepath;
   if (!std::filesystem::exists(filepath)) {
     LOG(ERROR) << "file " << filepath << " does not exist";
     std::terminate();
@@ -22,11 +22,11 @@ mp3 mp3::create(fs::path filepath) {
   FILE *fd = fopen(filepath.c_str(), "rb");
   fhandle f{fd};
 
-  return mp3(std::move(f), sz);
+  return {std::move(f), sz};
 }
 
 int mp3::send_chunk(const asio::ip::tcp::socket &socket) {
-  off_t len;
+  off_t len = 0;
   return call_sendfile(socket, len);
 }
 

@@ -47,7 +47,7 @@ namespace am {
 
 std::string make_daytime_string() {
   using namespace std; // For time_t, time and ctime;
-  time_t now = time(0);
+  time_t now = time(nullptr);
   return ctime(&now);
 }
 
@@ -76,17 +76,17 @@ private:
 class tcp_connection : public std::enable_shared_from_this<tcp_connection> {
 public:
   static constexpr auto interval = asio::chrono::seconds(5);
-  typedef std::shared_ptr<tcp_connection> pointer;
+  using pointer = std::shared_ptr<tcp_connection>;
 
   static pointer create(asio::io_context &io_context) {
     LOG(INFO) << "creating file";
     mp3 file = mp3::create(fs::path("./classical-triumphant-march-163852.mp3"));
 
-    return pointer(new tcp_connection(io_context, std::move(file)),
+    return {new tcp_connection(io_context, std::move(file)),
                    [](tcp_connection *conn) {
                      std::cout << "deleting " << conn << std::endl;
                      delete conn;
-                   });
+                   }};
   }
 
   tcp::socket &socket() { return socket_; }
@@ -228,13 +228,13 @@ private:
 
 int main() {
   using namespace am;
-  struct sigaction sigIntHandler;
+  struct sigaction sigIntHandler {};
 
   sigIntHandler.sa_handler = my_handler;
   sigemptyset(&sigIntHandler.sa_mask);
   sigIntHandler.sa_flags = 0;
 
-  sigaction(SIGINT, &sigIntHandler, NULL);
+  sigaction(SIGINT, &sigIntHandler, nullptr);
 
   try {
     asio::io_context io_context;
