@@ -83,10 +83,10 @@ public:
     mp3 file = mp3::create(fs::path("./classical-triumphant-march-163852.mp3"));
 
     return {new tcp_connection(io_context, std::move(file)),
-                   [](tcp_connection *conn) {
-                     std::cout << "deleting " << conn << std::endl;
-                     delete conn;
-                   }};
+            [](tcp_connection *conn) {
+              std::cout << "deleting " << conn << std::endl;
+              delete conn;
+            }};
   }
 
   tcp::socket &socket() { return socket_; }
