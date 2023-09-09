@@ -5,6 +5,8 @@
 #include <cstring>
 #include <filesystem>
 
+namespace am {
+
 void ServerDecoder::try_read_server(RingBuffer  &state) {
   if (try_read(state)) {
     if (_envelope.message_type == 3) {
@@ -28,4 +30,6 @@ void ServerEncoder::fill_time(std::string_view time, RingBuffer &buff) {
 void ServerEncoder::fill_mp3(mp3 &file, RingBuffer &buff) {
   fill_envelope(Envelope{2, static_cast<int>(file.size())}, buff);
   // send file will send the rest
+}
+
 }

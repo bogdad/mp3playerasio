@@ -10,13 +10,16 @@
 #include <optional>
 #include <sys/socket.h>
 
+namespace am {
+
 mp3 mp3::create(fs::path filepath) {
   printf("filepath %s\n", filepath.c_str());
+  if (!std::filesystem::exists(filepath)) {
+    LOG(ERROR) << "file " << filepath << " does not exist";
+    std::terminate();
+  }
+  auto sz = std::filesystem::file_size(filepath);
   FILE *fd = fopen(filepath.c_str(), "rb");
-  fseek(fd, 0, SEEK_END);
-  size_t sz = ftell(fd);
-  fseek(fd, 0, SEEK_SET);
-
   fhandle f{fd};
 
   return mp3(std::move(f), sz);
@@ -59,4 +62,6 @@ void file_view::consume(size_t l) {
   if (l > len())
     std::terminate();
   _current += l;
+}
+
 }

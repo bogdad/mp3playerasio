@@ -2,6 +2,8 @@
 #include "protocol.hpp"
 #include <absl/log/log.h>
 
+namespace am {
+
 void ClientDecoder::try_read_client(RingBuffer &state) {
   if (try_read(state)) {
     //_envelope.log();
@@ -28,4 +30,5 @@ void ClientDecoder::try_read_client(RingBuffer &state) {
 void ClientEncoder::fill_message(std::string_view msg, RingBuffer &buff) {
   fill_envelope(Envelope{ 3, static_cast<int>(msg.size())}, buff);
   buff.memcpy_in((char *)msg.data(), msg.size());
+}
 }

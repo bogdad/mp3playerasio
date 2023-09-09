@@ -16,7 +16,10 @@
 #include "protocol.hpp"
 
 using asio::ip::tcp;
+
 int main(int argc, char *argv[]) {
+
+  using namespace am;
 
   std::srand(std::time(nullptr));
   try {
@@ -37,7 +40,7 @@ int main(int argc, char *argv[]) {
       for (auto sv: ts) {
         LOG(INFO) << "time " << sv;
       }
-      int rand_delay = std::rand() % 15;
+      int rand_delay = arc4random() % 15;
       std::cout << "sleeping for " << rand_delay << std::endl;
 
       std::this_thread::sleep_for(std::chrono::seconds(rand_delay));
@@ -63,8 +66,9 @@ int main(int argc, char *argv[]) {
         std::cout << "eof!" << std::endl;
         break;
       }
-      if (error)
+      if (error) {
         throw asio::system_error(error); // Some other error.
+      }
     }
   } catch (std::exception &e) {
     std::cout << "ex: " << e.what() << std::endl;

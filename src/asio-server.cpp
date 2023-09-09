@@ -43,6 +43,8 @@
 
 using asio::ip::tcp;
 
+namespace am {
+
 std::string make_daytime_string() {
   using namespace std; // For time_t, time and ctime;
   time_t now = time(0);
@@ -215,7 +217,10 @@ private:
   tcp::acceptor acceptor_;
 };
 
+}
+
 int main() {
+  using namespace am;
   struct sigaction sigIntHandler;
 
   sigIntHandler.sa_handler = my_handler;
@@ -227,7 +232,7 @@ int main() {
   try {
     asio::io_context io_context;
     tcp_server server(io_context);
-    infinite_timer timer(io_context);
+    const infinite_timer timer(io_context);
     while (!should_stop) {
       io_context.run_one();
     }
@@ -237,3 +242,4 @@ int main() {
 
   return 0;
 }
+

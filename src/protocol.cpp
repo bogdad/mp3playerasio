@@ -8,6 +8,8 @@
 #include <string>
 #include <string_view>
 
+namespace am {
+
 RingBuffer::RingBuffer(std::size_t size): _size(size), _data(size) {
   _filled_start = 0;
   _filled_size = 0;
@@ -131,10 +133,10 @@ inline char RingBuffer::char_at(std::size_t pos) const {
   return _data.at(pos - _size);
 }
 
-typedef union {
+using raw_int = union {
     char c[4];
     int i;
-} raw_int;
+};
 
 int RingBuffer::peek_int() const {
   check(4, "peek_int");
@@ -210,4 +212,6 @@ void Decoder::reset() {
 
 void Encoder::fill_envelope(Envelope envelope, RingBuffer &buff) {
   buff.memcpy_in(&envelope, sizeof(envelope));
+}
+
 }

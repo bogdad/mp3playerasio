@@ -26,6 +26,8 @@ server sends mp3
 
  */
 
+namespace am {
+
 using mutable_buffers = std::vector<asio::mutable_buffer>;
 using const_buffers = std::vector<asio::const_buffer>;
 
@@ -140,3 +142,4 @@ struct Decoder {
 struct Encoder {
   void fill_envelope(Envelope envelope, RingBuffer &buff);
 };
+}

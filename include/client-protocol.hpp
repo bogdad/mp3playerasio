@@ -8,6 +8,10 @@
 #include <string_view>
 #include <vector>
 
+namespace am {
+
+
+
 using mutable_buffers = std::vector<asio::mutable_buffer>;
 using const_buffers = std::vector<asio::const_buffer>;
 
@@ -27,3 +31,5 @@ struct ClientDecoder : Decoder {
 struct ClientEncoder : Encoder {
 	void fill_message(std::string_view msg, RingBuffer &buff);
 };
+
+}

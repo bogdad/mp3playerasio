@@ -11,6 +11,8 @@
 #include <memory>
 #include <optional>
 
+namespace am {
+
 namespace fs = std::filesystem;
 
 struct file_deleter {
@@ -43,3 +45,4 @@ private:
   bool _started{false};
   file_view _current;
 };
+}
