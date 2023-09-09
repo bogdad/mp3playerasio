@@ -53,7 +53,7 @@ bool mp3::is_all_sent() const { return _current._current == _current._size; }
 
 size_t mp3::size() const { return _size; }
 
-off_t file_view::len() { return _size - _current; }
+off_t file_view::len() const { return _size - _current; }
 
 void file_view::consume(size_t l) {
   if (l > len())

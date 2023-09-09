@@ -22,7 +22,7 @@ using fhandle = std::unique_ptr<std::FILE, file_deleter>;
 struct file_view {
   size_t _current;
   size_t _size;
-  off_t len();
+  off_t len() const;
   void consume(size_t len);
 };
 
