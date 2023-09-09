@@ -64,4 +64,4 @@ void file_view::consume(size_t l) {
   _current += l;
 }
 
-}
+} // namespace am

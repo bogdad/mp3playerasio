@@ -45,4 +45,4 @@ private:
   bool _started{false};
   file_view _current;
 };
-}
+} // namespace am

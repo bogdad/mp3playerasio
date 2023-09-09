@@ -33,28 +33,24 @@ using const_buffers = std::vector<asio::const_buffer>;
 
 using bytes_view = std::span<const char>;
 
-template <typename Buffer>
-struct buffers_2 {
+template <typename Buffer> struct buffers_2 {
   using value_type = Buffer;
   using const_iterator = const value_type *;
-  buffers_2():_buffer_count(0){};
-  explicit buffers_2(const value_type& buffer): _buffer_count(1) {
+  buffers_2() : _buffer_count(0){};
+  explicit buffers_2(const value_type &buffer) : _buffer_count(1) {
     _buffers[0] = buffer;
   }
-  buffers_2(const value_type& buffer1, const value_type& buffer2): _buffer_count(2) {
+  buffers_2(const value_type &buffer1, const value_type &buffer2)
+      : _buffer_count(2) {
     _buffers[0] = buffer1;
     _buffers[1] = buffer2;
   }
 
-  const_iterator begin() const {
-    return std::addressof(_buffers[0]);
-  };
+  const_iterator begin() const { return std::addressof(_buffers[0]); };
   const_iterator end() const {
     return std::addressof(_buffers[0]) + _buffer_count;
   }
-  bool empty() const {
-    return !_buffer_count;
-  }
+  bool empty() const { return !_buffer_count; }
 
 private:
   std::array<Buffer, 2> _buffers;
@@ -94,7 +90,7 @@ struct RingBuffer {
   // non filled sequence for writes
   mutable_buffers_type prepared();
   mutable_buffers_type prepared(std::size_t max_size);
-  
+
   const_buffers_type data() const;
   const_buffers_type data(std::size_t max_size) const;
 
@@ -102,10 +98,10 @@ struct RingBuffer {
   size_t ready_size() const;
 
   template <typename Sink>
-  friend void AbslStringify(Sink& sink, const RingBuffer &buffer) {
-    absl::Format(&sink, "[(%zu, %zu)],[(%zu, %zu)]", 
-      buffer._filled_start, buffer._filled_size,
-      buffer._non_filled_start, buffer._non_filled_size);
+  friend void AbslStringify(Sink &sink, const RingBuffer &buffer) {
+    absl::Format(&sink, "[(%zu, %zu)],[(%zu, %zu)]", buffer._filled_start,
+                 buffer._filled_size, buffer._non_filled_start,
+                 buffer._non_filled_size);
   }
 
   void check(int len, std::string_view method) const;
@@ -142,4 +138,4 @@ struct Decoder {
 struct Encoder {
   void fill_envelope(Envelope envelope, RingBuffer &buff);
 };
-}
+} // namespace am

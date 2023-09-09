@@ -99,7 +99,9 @@ public:
 private:
   tcp_connection(asio::io_context &io_context, mp3 &&file)
       : socket_(io_context), timer_(io_context), buff_(1024),
-        _file(std::move(file)), _server_decoder([this](buffers_2<std::string_view> msg){on_message(msg);}) {}
+        _file(std::move(file)),
+        _server_decoder(
+            [this](buffers_2<std::string_view> msg) { on_message(msg); }) {}
 
   void send_date() {
     message_ = make_daytime_string();
@@ -107,20 +109,21 @@ private:
     auto ptr = shared_from_this();
     _server_encoder.fill_time(message_, _write_buffer);
 
-    send([ptr](){
-      ptr->send_mp3();
-    }, [](const asio::error_code &) { LOG(ERROR) << "send date error";});
+    send([ptr]() { ptr->send_mp3(); },
+         [](const asio::error_code &) { LOG(ERROR) << "send date error"; });
   }
 
   void send_mp3() {
     auto ptr = shared_from_this();
     _server_encoder.fill_mp3(_file, _write_buffer);
-    send([ptr]() {
-      LOG(INFO) << "server: sending mp3 envelope success";
-      ptr->send_mp3_inner();
-    }, [ptr](const asio::error_code& ec){
-      LOG(ERROR) << "sending mp3 failed " << ec;
-    });
+    send(
+        [ptr]() {
+          LOG(INFO) << "server: sending mp3 envelope success";
+          ptr->send_mp3_inner();
+        },
+        [ptr](const asio::error_code &ec) {
+          LOG(ERROR) << "sending mp3 failed " << ec;
+        });
   }
   void send_mp3_inner() {
     LOG(INFO) << "server: calling sendfile";
@@ -145,31 +148,35 @@ private:
   }
 
   void on_message(buffers_2<std::string_view> msg) {
-    for (auto part: msg) {
+    for (auto part : msg) {
       LOG(INFO) << "clent sent " << part;
     }
   }
 
-  void send(absl::AnyInvocable<void() const> &&continuation, absl::AnyInvocable<void(const asio::error_code&) const> &&on_error) {
+  void
+  send(absl::AnyInvocable<void() const> &&continuation,
+       absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {
     auto ptr = shared_from_this();
-    socket_.async_write_some(_write_buffer.data(), 
-      [this, ptr, on_error=std::move(on_error), continuation=std::move(continuation)](const asio::error_code& ec, const size_t bytes_transferred) mutable {
-      LOG(INFO) << "server: sending send" << _write_buffer;
-      if (ec) {
-        _write_buffer.commit(bytes_transferred);
-        on_error(ec);
-      } else {
-        _write_buffer.commit(bytes_transferred);
-        if (_write_buffer.empty()) {
-          _write_buffer.reset();
-          continuation();
-        } else {
-          send(std::move(continuation), std::move(on_error));
-        }
-      }
-    });
+    socket_.async_write_some(
+        _write_buffer.data(), [this, ptr, on_error = std::move(on_error),
+                               continuation = std::move(continuation)](
+                                  const asio::error_code &ec,
+                                  const size_t bytes_transferred) mutable {
+          LOG(INFO) << "server: sending send" << _write_buffer;
+          if (ec) {
+            _write_buffer.commit(bytes_transferred);
+            on_error(ec);
+          } else {
+            _write_buffer.commit(bytes_transferred);
+            if (_write_buffer.empty()) {
+              _write_buffer.reset();
+              continuation();
+            } else {
+              send(std::move(continuation), std::move(on_error));
+            }
+          }
+        });
   }
-
 
   tcp::socket socket_;
   std::string message_;
@@ -217,7 +224,7 @@ private:
   tcp::acceptor acceptor_;
 };
 
-}
+} // namespace am
 
 int main() {
   using namespace am;
@@ -242,4 +249,3 @@ int main() {
 
   return 0;
 }
-

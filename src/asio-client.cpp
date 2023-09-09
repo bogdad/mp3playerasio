@@ -34,10 +34,10 @@ int main(int argc, char *argv[]) {
     asio::connect(socket, endpoints);
     RingBuffer read_buffer{8388608};
 
-    ClientEncoder client_encoder {};
+    ClientEncoder client_encoder{};
 
     auto on_time = [&socket](buffers_2<std::string_view> ts) {
-      for (auto sv: ts) {
+      for (auto sv : ts) {
         LOG(INFO) << "time " << sv;
       }
       int rand_delay = arc4random() % 15;
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
       std::this_thread::sleep_for(std::chrono::seconds(rand_delay));
     };
     auto on_mp3_bytes = [](buffers_2<bytes_view> ts) {
-      for( auto spn: ts) {
+      for (auto spn : ts) {
         std::string encoded;
         absl::Base64Escape(absl::string_view(spn.data(), spn.size()), &encoded);
         std::cout << "finished reading " << encoded << std::endl;

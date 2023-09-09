@@ -7,7 +7,7 @@
 
 namespace am {
 
-void ServerDecoder::try_read_server(RingBuffer  &state) {
+void ServerDecoder::try_read_server(RingBuffer &state) {
   if (try_read(state)) {
     if (_envelope.message_type == 3) {
       // get time
@@ -32,4 +32,4 @@ void ServerEncoder::fill_mp3(mp3 &file, RingBuffer &buff) {
   // send file will send the rest
 }
 
-}
+} // namespace am
