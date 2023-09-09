@@ -154,10 +154,10 @@ private:
       [this, ptr, on_error=std::move(on_error), continuation=std::move(continuation)](const asio::error_code& ec, const size_t bytes_transferred) mutable {
       LOG(INFO) << "server: sending send" << _write_buffer;
       if (ec) {
-        _write_buffer.consume(bytes_transferred);
+        _write_buffer.commit(bytes_transferred);
         on_error(ec);
       } else {
-        _write_buffer.consume(bytes_transferred);
+        _write_buffer.commit(bytes_transferred);
         if (_write_buffer.empty()) {
           _write_buffer.reset();
           continuation();

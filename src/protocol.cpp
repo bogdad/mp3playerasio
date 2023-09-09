@@ -65,7 +65,7 @@ RingBuffer::const_buffers_type RingBuffer::data() const {
       asio::const_buffer(_data.data(), _filled_size-left_to_the_right));
   }
   return const_buffers_type(
-    asio::const_buffer(&_data.at(_filled_start), _filled_start));
+    asio::const_buffer(&_data.at(_filled_start), _filled_size));
 }
 
 RingBuffer::const_buffers_type RingBuffer::data(std::size_t max_size) const {
