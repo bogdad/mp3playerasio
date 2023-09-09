@@ -97,6 +97,7 @@ struct RingBuffer {
   const_buffers_type data(std::size_t max_size) const;
 
   bool empty() const;
+  size_t ready_size() const;
 
   template <typename Sink>
   friend void AbslStringify(Sink& sink, const RingBuffer &buffer) {
@@ -120,36 +121,6 @@ private:
   std::size_t _non_filled_size;
 };
 
-
-
-
-
-struct ReadBuffer {
-
-  // parsing part
-  int nw() const;
-  int peek_int() const;
-  std::string_view peek_string_view(int len) const;
-  bytes_view peek_span(int len) const;
-
-  void skip_len(int len);
-  void check(int len, std::string_view method) const;
-
-  // socket reading
-  asio::mutable_buffer next_buffer();
-  void advance_buffer(int len);
-
-  std::array<char, 8388608> _buff0;
-  std::array<char, 8388608> _buff1;
-
-  std::span<char> buff();
-  std::span<const char> cbuff() const;
-
-  int _curr;
-  int _last_written;
-  int _cur_buffer = 0;
-};
-
 struct Envelope {
   void log();
   int message_type;
@@ -162,10 +133,7 @@ struct Decoder {
   DecoderState _state{};
   Envelope _envelope{};
 
-  bool try_read(ReadBuffer &state);
-
-
-
+  bool try_read(RingBuffer &state);
   void reset();
 };
 

@@ -97,7 +97,7 @@ public:
 private:
   tcp_connection(asio::io_context &io_context, mp3 &&file)
       : socket_(io_context), timer_(io_context), buff_(1024),
-        _file(std::move(file)), _server_decoder([this](std::string_view msg){on_message(msg);}) {}
+        _file(std::move(file)), _server_decoder([this](buffers_2<std::string_view> msg){on_message(msg);}) {}
 
   void send_date() {
     message_ = make_daytime_string();
@@ -142,8 +142,10 @@ private:
     };
   }
 
-  void on_message(std::string_view msg) {
-    LOG(INFO) << "clent sent " << msg;
+  void on_message(buffers_2<std::string_view> msg) {
+    for (auto part: msg) {
+      LOG(INFO) << "clent sent " << part;
+    }
   }
 
   void send(absl::AnyInvocable<void() const> &&continuation, absl::AnyInvocable<void(const asio::error_code&) const> &&on_error) {
@@ -177,7 +179,7 @@ private:
   mp3 _file;
   RingBuffer _write_buffer{8388608};
   ServerEncoder _server_encoder{};
-  ReadBuffer _read_buffer{};
+  RingBuffer _read_buffer{8388608};
   ServerDecoder _server_decoder;
 };
 

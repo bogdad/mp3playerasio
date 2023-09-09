@@ -29,30 +29,34 @@ int main(int argc, char *argv[]) {
     tcp::resolver::results_type endpoints = resolver.resolve(argv[1], "8060");
     tcp::socket socket(io_context);
     asio::connect(socket, endpoints);
-    ReadBuffer read_buffer{};
+    RingBuffer read_buffer{8388608};
 
     ClientEncoder client_encoder {};
 
-    auto on_time = [&socket](std::string_view ts) {
-      LOG(INFO) << "time " << ts;
+    auto on_time = [&socket](buffers_2<std::string_view> ts) {
+      for (auto sv: ts) {
+        LOG(INFO) << "time " << sv;
+      }
       int rand_delay = std::rand() % 15;
       std::cout << "sleeping for " << rand_delay << std::endl;
 
       std::this_thread::sleep_for(std::chrono::seconds(rand_delay));
     };
-    auto on_mp3_bytes = [](bytes_view ts) {
-      std::string encoded;
-      absl::Base64Escape(absl::string_view(ts.data(), ts.size()), &encoded);
-      std::cout << "finished reading " << encoded << std::endl;
+    auto on_mp3_bytes = [](buffers_2<bytes_view> ts) {
+      for( auto spn: ts) {
+        std::string encoded;
+        absl::Base64Escape(absl::string_view(spn.data(), spn.size()), &encoded);
+        std::cout << "finished reading " << encoded << std::endl;
+      }
     };
 
     ClientDecoder handler(on_time, on_mp3_bytes);
     for (;;) {
       asio::error_code error;
-      LOG(INFO) << "read_buffer curr " << read_buffer._curr << " last_written " << read_buffer._last_written;
-      size_t len = socket.read_some(read_buffer.next_buffer(), error);
+      LOG(INFO) << "read_buffer curr " << read_buffer;
+      size_t len = socket.read_some(read_buffer.prepared(), error);
       LOG(INFO) << "read " << len;
-      read_buffer.advance_buffer(len);
+      read_buffer.consume(len);
 
       handler.try_read_client(read_buffer);
       if (error == asio::error::eof) {

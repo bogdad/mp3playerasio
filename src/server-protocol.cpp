@@ -5,14 +5,14 @@
 #include <cstring>
 #include <filesystem>
 
-void ServerDecoder::try_read_server(ReadBuffer &state) {
+void ServerDecoder::try_read_server(RingBuffer  &state) {
   if (try_read(state)) {
     if (_envelope.message_type == 3) {
       // get time
-      if (state.nw() >= _envelope.message_size) {
+      if (state.ready_size() >= _envelope.message_size) {
         // got time
         _on_message(state.peek_string_view(_envelope.message_size));
-        state.skip_len(_envelope.message_size);
+        state.commit(_envelope.message_size);
         reset();
         try_read_server(state);
       }

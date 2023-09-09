@@ -114,6 +114,10 @@ bool RingBuffer::empty() const {
   return _filled_size == 0;
 }
 
+std::size_t RingBuffer::ready_size() const {
+  return _filled_size;
+}
+
 void RingBuffer::check(int len, std::string_view method) const {
   if (len > _filled_size) {
     LOG(ERROR) << "RingBuffer " << method << ": cant read "
@@ -172,57 +176,18 @@ buffers_2<std::span<const char>> RingBuffer::peek_span(int len) const {
   }
 }
 
-int ReadBuffer::nw() const { return _last_written - _curr; }
-
-std::string_view ReadBuffer::peek_string_view(int len) const {
-  check(len, "peek_string_view");
-  return std::string_view(cbuff().data() + _curr, len);
-}
-
-bytes_view ReadBuffer::peek_span(int len) const {
-  check(len, "peek_span");
-  return cbuff().subspan(_curr, len);
-}
-
-void ReadBuffer::skip_len(int len) { _curr += len; }
-
-asio::mutable_buffer ReadBuffer::next_buffer() {
-  auto buf = buff();
-  if (buf.size() == _last_written) {
-    LOG(ERROR) << "buffer exhausted " << buf.size() << " / " << _last_written;
-    std::terminate();
-  }
-  auto ret = asio::mutable_buffer((char *)buf.data() + _last_written,
-                                  buf.size() - _last_written);
-  return ret;
-}
-
-void ReadBuffer::advance_buffer(int len) { _last_written += len; }
-
-std::span<char> ReadBuffer::buff() {
-  if (_cur_buffer != 0)
-    return _buff1;
-  return _buff0;
-}
-
-std::span<const char> ReadBuffer::cbuff() const {
-  if (_cur_buffer != 0)
-    return _buff1;
-  return _buff0;
-}
-
 void Envelope::log() {
   LOG(INFO) << "envelope message type " << message_type << " message size " << message_size;
 }
 
-bool Decoder::try_read(ReadBuffer &state) {
+bool Decoder::try_read(RingBuffer &state) {
   if (_state == DecoderState::before_envelope) {
-    if (state.nw() >= sizeof(Envelope)) {
+    if (state.ready_size() >= sizeof(Envelope)) {
       // we can parse the envelope now
       _envelope.message_type = state.peek_int();
-      state.skip_len(4);
+      state.commit(4);
       _envelope.message_size = state.peek_int();
-      state.skip_len(4);
+      state.commit(4);
       _state = DecoderState::have_envelope;
       LOG(INFO) << "Handle::try_read state " << (int)_state
                 << " envelope, message_size " << _envelope.message_size
