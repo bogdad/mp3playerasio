@@ -1,15 +1,31 @@
 #include "server-protocol.hpp"
 #include "protocol.hpp"
+#include <absl/log/log.h>
 #include <asio/buffer.hpp>
 #include <cstring>
 #include <filesystem>
 
-void ServerEncoder::fill_time(std::string_view time, WriteBuffer &buff) {
-  fill_envelope(Envelope{1, static_cast<int>(time.size())}, buff);
-  buff.memcpy_in(time.data(), time.size());
+void ServerDecoder::try_read_server(ReadBuffer &state) {
+  if (try_read(state)) {
+    if (_envelope.message_type == 3) {
+      // get time
+      if (state.nw() >= _envelope.message_size) {
+        // got time
+        _on_message(state.peek_string_view(_envelope.message_size));
+        state.skip_len(_envelope.message_size);
+        reset();
+        try_read_server(state);
+      }
+    }
+  }
 }
 
-void ServerEncoder::fill_mp3(mp3 &file, WriteBuffer &buff) {
+void ServerEncoder::fill_time(std::string_view time, RingBuffer &buff) {
+  fill_envelope(Envelope{1, static_cast<int>(time.size())}, buff);
+  buff.memcpy_in((char *)time.data(), time.size());
+}
+
+void ServerEncoder::fill_mp3(mp3 &file, RingBuffer &buff) {
   fill_envelope(Envelope{2, static_cast<int>(file.size())}, buff);
   // send file will send the rest
 }

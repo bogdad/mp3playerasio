@@ -1,7 +1,10 @@
 #include "client-protocol.hpp"
+#include "protocol.hpp"
+#include <absl/log/log.h>
 
 void ClientDecoder::try_read_client(ReadBuffer &state) {
   if (try_read(state)) {
+    //_envelope.log();
     if (_envelope.message_type == 1) {
       // get time
       if (state.nw() >= _envelope.message_size) {
@@ -20,4 +23,9 @@ void ClientDecoder::try_read_client(ReadBuffer &state) {
       }
     }
   }
+}
+
+void ClientEncoder::fill_message(std::string_view msg, RingBuffer &buff) {
+  fill_envelope(Envelope{ 3, static_cast<int>(msg.size())}, buff);
+  buff.memcpy_in((char *)msg.data(), msg.size());
 }

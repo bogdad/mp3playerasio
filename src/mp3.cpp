@@ -33,6 +33,7 @@ int mp3::call_sendfile(const asio::ip::tcp::socket &socket, off_t &len) {
   int res = sendfile(fileno(_fd.get()),
                      non_const_socket.lowest_layer().native_handle(),
                      _current._current, &len, nullptr, 0);
+  LOG(INFO) << "sent " << len;
   if (res == 0) {
     _current.consume(len);
   } else {

@@ -29,7 +29,9 @@ int main(int argc, char *argv[]) {
     tcp::resolver::results_type endpoints = resolver.resolve(argv[1], "8060");
     tcp::socket socket(io_context);
     asio::connect(socket, endpoints);
-    ReadBuffer state{};
+    ReadBuffer read_buffer{};
+
+    ClientEncoder client_encoder {};
 
     auto on_time = [&socket](std::string_view ts) {
       LOG(INFO) << "time " << ts;
@@ -37,19 +39,6 @@ int main(int argc, char *argv[]) {
       std::cout << "sleeping for " << rand_delay << std::endl;
 
       std::this_thread::sleep_for(std::chrono::seconds(rand_delay));
-
-      std::stringstream str;
-      str << "we reply this to it " << rand_delay;
-      std::string strstr = str.str();
-
-      asio::error_code error;
-      auto nwrote = socket.write_some(
-          asio::buffer(strstr.c_str(), strstr.length() + 1), error);
-      std::cout << "write error: " << error << std::endl;
-      if (error == asio::error::eof) {
-        std::cout << "eof!" << std::endl;
-      }
-      std::cout << "wrote " << nwrote << " of " << strstr << std::endl;
     };
     auto on_mp3_bytes = [](bytes_view ts) {
       std::string encoded;
@@ -60,11 +49,12 @@ int main(int argc, char *argv[]) {
     ClientDecoder handler(on_time, on_mp3_bytes);
     for (;;) {
       asio::error_code error;
+      LOG(INFO) << "read_buffer curr " << read_buffer._curr << " last_written " << read_buffer._last_written;
+      size_t len = socket.read_some(read_buffer.next_buffer(), error);
+      LOG(INFO) << "read " << len;
+      read_buffer.advance_buffer(len);
 
-      size_t len = socket.read_some(state.next_buffer(), error);
-      state.advance_buffer(len);
-
-      handler.try_read_client(state);
+      handler.try_read_client(read_buffer);
       if (error == asio::error::eof) {
         std::cout << "eof!" << std::endl;
         break;

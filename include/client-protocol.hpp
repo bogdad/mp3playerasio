@@ -23,3 +23,7 @@ struct ClientDecoder : Decoder {
   absl::AnyInvocable<void(std::string_view)> _on_time;
   absl::AnyInvocable<void(bytes_view)> _on_mp3_bytes;
 };
+
+struct ClientEncoder : Encoder {
+	void fill_message(std::string_view msg, RingBuffer &buff);
+};

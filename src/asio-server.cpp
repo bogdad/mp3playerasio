@@ -97,7 +97,7 @@ public:
 private:
   tcp_connection(asio::io_context &io_context, mp3 &&file)
       : socket_(io_context), timer_(io_context), buff_(1024),
-        _file(std::move(file)) {}
+        _file(std::move(file)), _server_decoder([this](std::string_view msg){on_message(msg);}) {}
 
   void send_date() {
     message_ = make_daytime_string();
@@ -105,25 +105,34 @@ private:
     auto ptr = shared_from_this();
     _server_encoder.fill_time(message_, _write_buffer);
 
-    asio::async_write(
-        socket_, _write_buffer.as_buffer(),
-        [ptr](const asio::error_code &error, size_t bytes_transferred) {
-          ptr->handle_write_1(error, bytes_transferred);
-        });
+    send([ptr](){
+      ptr->send_mp3();
+    }, [](const asio::error_code &) { LOG(ERROR) << "send date error";});
   }
 
   void send_mp3() {
+    auto ptr = shared_from_this();
     _server_encoder.fill_mp3(_file, _write_buffer);
+    send([ptr]() {
+      LOG(INFO) << "server: sending mp3 envelope success";
+      ptr->send_mp3_inner();
+    }, [ptr](const asio::error_code& ec){
+      LOG(ERROR) << "sending mp3 failed " << ec;
+    });
+  }
+  void send_mp3_inner() {
+    LOG(INFO) << "server: calling sendfile";
     if (_file.send_chunk(socket_) == 0) {
       if (_file.is_all_sent()) {
         asio::error_code ec{};
-        handle_write_2(ec, 0);
+        // all done
+        socket_.close();
       } else {
         auto ptr = shared_from_this();
         socket_.async_write_some(
             asio::null_buffers(),
             [ptr](const asio::error_code &error, size_t bytes_transferred) {
-              ptr->handle_write_1(error, bytes_transferred);
+              ptr->send_mp3_inner();
             });
       }
     } else {
@@ -133,47 +142,31 @@ private:
     };
   }
 
-  void handle_write_1(const asio::error_code &error,
-                      size_t /*bytes_transferred*/) {
-    send_mp3();
+  void on_message(std::string_view msg) {
+    LOG(INFO) << "clent sent " << msg;
   }
 
-  void handle_write_2(const asio::error_code &error,
-                      size_t /*bytes_transferred*/) {
-    if (!error) {
-      std::cout << "staring reading from the client" << std::endl;
-      auto self = shared_from_this();
-      timer_.expires_from_now(interval);
-      timer_.async_wait([self](const asio::error_code &) {
-        std::cout << "timeout timer fired" << std::endl;
-        self->was_timeout_ = true;
-        self->socket_.shutdown(asio::socket_base::shutdown_both);
-        self->socket_.close();
-      });
-      asio::async_read_until(
-          socket_, buff_, '\n',
-          [self](const asio::error_code err, size_t read_size) {
-            if (err == asio::error::operation_aborted) {
-              std::cout << "read from client timeout" << std::endl;
-              return;
-            }
-            using asio::streambuf;
-            size_t s = 0;
-            streambuf::const_buffers_type bufs = self->buff_.data();
-            streambuf::const_buffers_type::const_iterator i = bufs.begin();
-            std::cout << "read from client: ";
-            while (i != bufs.end()) {
-              asio::const_buffer buf(*i++);
-              std::cout << std::string_view(
-                  static_cast<const char *>(buf.data()), bufs.size());
-              s += buf.size();
-            }
-            std::cout << std::endl;
-            self->was_timeout_ = false;
-            self->timer_.cancel();
-          });
-    }
+  void send(absl::AnyInvocable<void() const> &&continuation, absl::AnyInvocable<void(const asio::error_code&) const> &&on_error) {
+    auto ptr = shared_from_this();
+    socket_.async_write_some(_write_buffer.data(), 
+      [this, ptr, on_error=std::move(on_error), continuation=std::move(continuation)](const asio::error_code& ec, const size_t bytes_transferred) mutable {
+      LOG(INFO) << "server: sending send" << _write_buffer;
+      if (ec) {
+        _write_buffer.consume(bytes_transferred);
+        on_error(ec);
+      } else {
+        _write_buffer.consume(bytes_transferred);
+        if (_write_buffer.empty()) {
+          _write_buffer.reset();
+          continuation();
+        } else {
+          send(std::move(continuation), std::move(on_error));
+        }
+      }
+    });
   }
+
+
   tcp::socket socket_;
   std::string message_;
   asio::streambuf buff_;
@@ -182,8 +175,10 @@ private:
   bool was_timeout_{false};
 
   mp3 _file;
-  WriteBuffer _write_buffer;
+  RingBuffer _write_buffer{8388608};
   ServerEncoder _server_encoder{};
+  ReadBuffer _read_buffer{};
+  ServerDecoder _server_decoder;
 };
 
 class tcp_server {
