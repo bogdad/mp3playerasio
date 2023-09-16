@@ -1,5 +1,6 @@
 #pragma once
 
+#include <absl/base/macros.h>
 #include <absl/functional/any_invocable.h>
 #include <absl/strings/str_format.h>
 #include <array>
@@ -51,6 +52,23 @@ template <typename Buffer> struct buffers_2 {
     return std::addressof(_buffers[0]) + _buffer_count;
   }
   bool empty() const { return !_buffer_count; }
+
+  std::size_t size() const {
+    if (_buffer_count == 0) return 0;
+    auto res = size_t(_buffers[0].size());
+    if (_buffer_count == 2)
+      res += _buffers[1].size();
+    return res;
+  }
+
+  inline std::byte& operator[](size_t pos) const {
+    ABSL_ASSERT(_buffer_count > 0);
+    auto b0size = _buffers[0].size();
+    if (pos < b0size) {
+      return _buffers[0][pos];
+    }
+    return _buffers[1][pos - b0size];
+  }
 
 private:
   std::array<Buffer, 2> _buffers;
