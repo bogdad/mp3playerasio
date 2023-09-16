@@ -80,7 +80,7 @@ public:
 
   static pointer create(asio::io_context &io_context) {
     LOG(INFO) << "creating file";
-    mp3 file = mp3::create(fs::path("./classical-triumphant-march-163852.mp3"));
+    Mp3 file = Mp3::create(fs::path("./classical-triumphant-march-163852.mp3"));
 
     return {new tcp_connection(io_context, std::move(file)),
             [](tcp_connection *conn) {
@@ -97,7 +97,7 @@ public:
   }
 
 private:
-  tcp_connection(asio::io_context &io_context, mp3 &&file)
+  tcp_connection(asio::io_context &io_context, Mp3 &&file)
       : socket_(io_context), timer_(io_context), buff_(1024),
         _file(std::move(file)),
         _server_decoder(
@@ -185,7 +185,7 @@ private:
   asio::steady_timer timer_;
   bool was_timeout_{false};
 
-  mp3 _file;
+  Mp3 _file;
   RingBuffer _write_buffer{8388608};
   ServerEncoder _server_encoder{};
   RingBuffer _read_buffer{8388608};

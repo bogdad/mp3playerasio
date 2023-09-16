@@ -27,7 +27,7 @@ void ServerEncoder::fill_time(std::string_view time, RingBuffer &buff) {
   buff.memcpy_in(static_cast<const char *>(time.data()), time.size());
 }
 
-void ServerEncoder::fill_mp3(mp3 &file, RingBuffer &buff) {
+void ServerEncoder::fill_mp3(Mp3 &file, RingBuffer &buff) {
   fill_envelope(Envelope{2, static_cast<int>(file.size())}, buff);
   // send file will send the rest
 }

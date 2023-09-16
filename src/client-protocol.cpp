@@ -17,9 +17,11 @@ void ClientDecoder::try_read_client(RingBuffer &state) {
         try_read_client(state);
       }
     } else if (_envelope.message_type == 2) {
+      const auto read_size = std::min(static_cast<int>(state.ready_size()), _envelope.message_size);
+      _on_mp3_bytes(state.peek_span(read_size));
+      state.commit(read_size);
       if (state.ready_size() >= _envelope.message_size) {
-        _on_mp3_bytes(state.peek_span(_envelope.message_size));
-        state.commit(_envelope.message_size);
+        // finished the file
         reset();
         try_read_client(state);
       }

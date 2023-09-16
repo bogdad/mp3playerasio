@@ -11,6 +11,7 @@
 #include <asio/registered_buffer.hpp>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <ostream>
@@ -51,6 +52,7 @@ struct TcpClientConnection: std::enable_shared_from_this<TcpClientConnection> {
 
 private:
   TcpClientConnection(asio::io_context &io_context): _socket(io_context), _read_buffer(8388608),
+  _out_file("./out.mp3", std::ofstream::binary),
   _client_decoder([this](buffers_2<std::string_view> ts) {
       for (auto sv : ts) {
         LOG(INFO) << "time " << sv;
@@ -59,11 +61,9 @@ private:
       std::cout << "sleeping for " << rand_delay << std::endl;
 
       std::this_thread::sleep_for(std::chrono::seconds(rand_delay));
-    }, [](buffers_2<bytes_view> ts) {
+    }, [this](buffers_2<bytes_view> ts) {
       for (auto spn : ts) {
-        std::string encoded;
-        absl::Base64Escape(absl::string_view(spn.data(), spn.size()), &encoded);
-        std::cout << "finished reading " << encoded << std::endl;
+        _out_file.write(spn.data(), spn.size());
       }
     }) {
   }
@@ -89,6 +89,7 @@ private:
   tcp::socket _socket;
   RingBuffer _read_buffer;
   ClientEncoder _client_encoder{};
+  std::ofstream _out_file;
   ClientDecoder _client_decoder;
 };
 

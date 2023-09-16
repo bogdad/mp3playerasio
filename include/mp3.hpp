@@ -28,15 +28,15 @@ struct file_view {
   void consume(size_t len);
 };
 
-struct mp3 {
+struct Mp3 {
 
-  static mp3 create(fs::path filepath);
+  static Mp3 create(fs::path filepath);
   size_t size() const;
   int send_chunk(const asio::ip::tcp::socket &socket);
   bool is_all_sent() const;
 
 private:
-  mp3(fhandle fd, size_t size)
+  Mp3(fhandle fd, size_t size)
       : _fd(std::move(fd)), _size(size), _current({0, size}){};
   int call_sendfile(const asio::ip::tcp::socket &socket, off_t &len);
 
