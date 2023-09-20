@@ -17,19 +17,20 @@ if(UBSAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=undefined")
 endif()
 
-find_package(asio 1.28.1 REQUIRED)
+find_package(asio REQUIRED)
 find_package(absl REQUIRED)
+find_package(minimp3 REQUIRED)
 
 add_library(protocol src/protocol.cpp)
 target_include_directories(protocol 
 	PUBLIC include)
 target_link_libraries(protocol 
-	PRIVATE asio::asio absl::any_invocable absl::log)
+	PRIVATE asio::asio absl::base absl::any_invocable absl::log)
 
 add_library(mp3 src/mp3.cpp)
 target_include_directories(mp3 PUBLIC include)
 target_link_libraries(mp3 
-	PRIVATE asio::asio absl::any_invocable absl::log)
+	PRIVATE asio::asio absl::any_invocable absl::log minimp3::minimp3)
 
 add_executable(asio-server 
 	src/asio-server.cpp src/server-protocol.cpp)

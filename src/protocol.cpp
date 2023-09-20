@@ -14,7 +14,10 @@ namespace am {
 
 RingBuffer::RingBuffer(std::size_t size)
     : _size(size), _data(size), _filled_start(0), _filled_size(0),
-      _non_filled_start(0), _non_filled_size(size) {}
+      _non_filled_start(0), _non_filled_size(size) {
+        _size = _data.len();
+        _non_filled_size = _data.len();
+      }
 
 void RingBuffer::reset() {
   _filled_start = 0;

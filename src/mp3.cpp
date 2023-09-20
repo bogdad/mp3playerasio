@@ -6,6 +6,7 @@
 #include <asio.hpp>
 #include <asio/ip/tcp.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <exception>
 #include <fstream>
@@ -13,7 +14,28 @@
 #include <span>
 #include <sys/socket.h>
 
+#define MINIMP3_IMPLEMENTATION
+#define MINIMP3_ONLY_MP3
+#include <minimp3.h>
+
 namespace am {
+
+struct Mp3Stream::Pimpl {
+  mp3dec_t mp3d{};
+
+  Pimpl() {
+    mp3dec_init(&mp3d);
+  }
+
+  void decode_next() {
+    mp3dec_frame_info_t info;
+    short pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
+    /*unsigned char *input_buf; - input byte stream*/
+    //int samples = mp3dec_decode_frame(&mp3d, input_buf, buf_size, pcm, &info);
+  }
+};
+
+
 
 Mp3 Mp3::create(fs::path filepath) {
   LOG(INFO) << "filepath " << filepath;
@@ -67,44 +89,6 @@ void file_view::consume(size_t l) {
   _current += l;
 }
 
-/*
-inspiration: https://hackage.haskell.org/package/mp3decoder-0.0.1/src/Codec/Audio/MP3/Unpack.hs
-*/
 
-struct Mp3Frame {
-  std::byte audio_version_id : 3;
-  std::byte layer_description : 2;
-  std::byte protection_bit : 1;
-  std::byte bitrate_index: 4;
-  std::byte sampling_rate_frequency_index: 2;
-  std::byte padding_bit: 1;
-  std::byte channel_mode: 2;
-  std::byte mode_extension: 2;
-  std::byte copyright: 1;
-  std::byte original: 1;
-  std::byte emphasis: 2;
-};
-
-struct Mp3FrameParser {
-
-  std::optional<Mp3Frame> try_read(buffers_2<std::span<std::byte>> data) {
-    if (data.size() < 4) return {};
-    Mp3Frame res{};
-    ABSL_ASSERT(data[0] == std::byte{255});
-    ABSL_ASSERT((data[1] >> (8 - 3)) & std::byte{0b11});
-    res.audio_version_id = ((data[1] & std::byte{0b00011111}) >> 3);
-    res.layer_description = ((data[1] & std::byte{0b00000111}) >> 1);
-    res.protection_bit = ((data[1] & std::byte{0b00000001}));
-    res.bitrate_index = ((data[2] & std::byte{0b11110000}) >> 4);
-    res.sampling_rate_frequency_index = ((data[2] & std::byte{0b00001100}) >> 2);
-    res.padding_bit = ((data[2] & std::byte{0b00000010}) >> 1);
-    res.channel_mode = ((data[3] & std::byte{0b11000000}) >> 6);
-    res.mode_extension = ((data[3] & std::byte{0b00110000}) >> 4);
-    res.copyright = ((data[3] & std::byte{0b00001000}) >> 3);
-    res.original = ((data[3] & std::byte{0b00000100}) >> 2);
-    res.emphasis = ((data[3] & std::byte{0b00000011}));
-    return res;
-  }
-};
 
 } // namespace am

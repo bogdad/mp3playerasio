@@ -8,13 +8,17 @@
 #include <asio/buffer.hpp>
 #include <asio/error_code.hpp>
 #include <cstddef>
+#include <cstdio>
 #include <exception>
 #include <iterator>
 #include <memory>
 #include <span>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <sys/mman.h>
 
 /*
 
@@ -75,6 +79,99 @@ private:
   std::size_t _buffer_count;
 };
 
+struct LinnearArray {
+  LinnearArray(std::size_t size):_ptr(nullptr), _p1(nullptr), _p2(nullptr), _len(0), _shname("") {
+    int res = init(size);
+    if (res == -1) {
+      std::terminate();
+    }
+    _ptr = _p1;
+  }
+  ~LinnearArray() {
+    if (_p1)
+      munmap(_p1, _len);
+    if (_p2)
+      munmap(_p2, _len);
+    if (!_shname.empty())
+      shm_unlink(_shname.c_str());  
+  }
+
+  int len() {
+    return _len;
+  }
+
+  char& at(size_t pos) {
+    return *(_ptr + pos);
+  }
+
+  const char& at(size_t pos) const {
+    return *(_ptr + pos);
+  }
+
+  char* data() {
+    return _ptr;
+  }
+
+  const char* data() const {
+    return _ptr;
+  }
+
+private:
+  int init(int minsize) {
+    int pagesize = ::sysconf(_SC_PAGESIZE);
+    int bytes = minsize & ~(pagesize-1);
+    if (minsize % pagesize) {
+      bytes += pagesize;
+    }
+    if (bytes*2u < bytes) {
+      errno = EINVAL;
+      perror("overflow");
+      return -1;
+    }
+    int r = arc4random() % 255;
+    std::stringstream s;
+    s << "buffer" << r;
+    const auto shname = s.str(); 
+    shm_unlink(shname.c_str());
+    int fd = shm_open(shname.c_str(),  O_RDWR | O_CREAT);
+    _shname = shname;
+    size_t len = bytes;
+    if (ftruncate(fd, len) == -1) {
+        perror("ftruncate");
+        return -1;
+    }
+    void *p = ::mmap(nullptr, 2*len, PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
+    if (p == MAP_FAILED){
+      perror("mmap");
+      return -1;
+    }
+    munmap(p, 2*len);
+
+    _p1 = (char*)mmap(p, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+    if (_p1 == MAP_FAILED){
+      perror("mmap1");
+      return -1;
+    }
+
+    _p2 = (char*)mmap((char*)p + len, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+    if (_p2 == MAP_FAILED){
+      perror("mmap2");
+      return -1;
+    }
+    printf("pointer %p %p %p %ld\n", p, _p1, _p2, (char*)_p2 - (char*)_p1);
+    _p1[0] = 'x';
+    printf("%c %c\n", _p1[0], _p2[0]);
+    _len = len;
+    return 0;
+  }
+
+  char *_ptr;
+  char *_p1;
+  char *_p2;
+  int _len;
+  std::string _shname;
+};
+
 struct RingBuffer {
   RingBuffer(std::size_t size);
 
@@ -130,7 +227,7 @@ struct RingBuffer {
 
 private:
   std::size_t _size;
-  std::vector<char> _data;
+  LinnearArray _data;
   std::size_t _filled_start;
   std::size_t _filled_size;
   std::size_t _non_filled_start;

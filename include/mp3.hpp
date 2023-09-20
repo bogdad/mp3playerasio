@@ -45,4 +45,31 @@ private:
   bool _started{false};
   file_view _current;
 };
+
+
+
+struct Mp3Stream {
+  struct Pimpl;
+  std::unique_ptr<Pimpl> _pimpl;
+};
+
+struct Mp3Frame {
+
+  std::size_t length() const;
+
+  std::byte audio_version_id : 3;
+  std::byte layer_description : 2;
+  std::byte protection_bit : 1;
+  std::byte bitrate_index: 4;
+  int bitrate;
+  std::byte sampling_rate_frequency_index: 2;
+  int sampling_rate;
+  std::byte padding_bit: 1;
+  std::byte channel_mode: 2;
+  std::byte mode_extension: 2;
+  std::byte copyright: 1;
+  std::byte original: 1;
+  std::byte emphasis: 2;
+};
+
 } // namespace am
