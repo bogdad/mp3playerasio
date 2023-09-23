@@ -9,6 +9,7 @@
 #include <asio/error_code.hpp>
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
 #include <exception>
 #include <iterator>
 #include <memory>
@@ -58,15 +59,15 @@ template <typename Buffer> struct buffers_2 {
   bool empty() const { return !_buffer_count; }
 
   std::size_t size() const {
-    if (_buffer_count == 0) return 0;
+    if (_buffer_count == 0)
+      return 0;
     auto res = size_t(_buffers[0].size());
     if (_buffer_count == 2)
       res += _buffers[1].size();
     return res;
   }
 
-  inline std::byte& operator[](size_t pos) const {
-    ABSL_ASSERT(_buffer_count > 0);
+  inline std::byte &operator[](size_t pos) const {
     auto b0size = _buffers[0].size();
     if (pos < b0size) {
       return _buffers[0][pos];
@@ -74,13 +75,16 @@ template <typename Buffer> struct buffers_2 {
     return _buffers[1][pos - b0size];
   }
 
+  inline std::size_t count() const { return _buffer_count; }
+
 private:
   std::array<Buffer, 2> _buffers;
   std::size_t _buffer_count;
 };
 
 struct LinnearArray {
-  LinnearArray(std::size_t size):_ptr(nullptr), _p1(nullptr), _p2(nullptr), _len(0), _shname("") {
+  LinnearArray(std::size_t size)
+      : _ptr(nullptr), _p1(nullptr), _p2(nullptr), _len(0), _shname("") {
     int res = init(size);
     if (res == -1) {
       std::terminate();
@@ -93,82 +97,85 @@ struct LinnearArray {
     if (_p2)
       munmap(_p2, _len);
     if (!_shname.empty())
-      shm_unlink(_shname.c_str());  
+      shm_unlink(_shname.c_str());
   }
+  LinnearArray(const LinnearArray &other) = delete;
+  LinnearArray &operator=(const LinnearArray &other) = delete;
 
-  int len() {
-    return _len;
-  }
+  std::size_t size() { return _len; }
 
-  char& at(size_t pos) {
-    return *(_ptr + pos);
-  }
+  inline char &at(std::size_t pos) { return *(_ptr + pos); }
 
-  const char& at(size_t pos) const {
-    return *(_ptr + pos);
-  }
+  inline const char &at(std::size_t pos) const { return *(_ptr + pos); }
 
-  char* data() {
-    return _ptr;
-  }
+  inline char *data() { return _ptr; }
 
-  const char* data() const {
-    return _ptr;
+  const char *data() const { return _ptr; }
+
+  std::vector<char> to_vector() {
+    auto res = std::vector<char>(size());
+    memcpy(res.data(), data(), size());
+    return res;
   }
 
 private:
-  int init(int minsize) {
-    int pagesize = ::sysconf(_SC_PAGESIZE);
-    int bytes = minsize & ~(pagesize-1);
+  int init(std::size_t minsize) {
+    pid_t pid = getpid();
+    static int counter = 0;
+    std::size_t pagesize = ::sysconf(_SC_PAGESIZE);
+    std::size_t bytes = minsize & ~(pagesize - 1);
     if (minsize % pagesize) {
       bytes += pagesize;
     }
-    if (bytes*2u < bytes) {
+    if (bytes * 2u < bytes) {
       errno = EINVAL;
       perror("overflow");
       return -1;
     }
-    int r = arc4random() % 255;
+    int r = counter++;
     std::stringstream s;
-    s << "buffer" << r;
-    const auto shname = s.str(); 
+    s << "pid_" << pid << "_buffer_" << r;
+    const auto shname = s.str();
     shm_unlink(shname.c_str());
-    int fd = shm_open(shname.c_str(),  O_RDWR | O_CREAT);
+    int fd = shm_open(shname.c_str(), O_RDWR | O_CREAT);
     _shname = shname;
-    size_t len = bytes;
+    std::size_t len = bytes;
     if (ftruncate(fd, len) == -1) {
-        perror("ftruncate");
-        return -1;
+      perror("ftruncate");
+      return -1;
     }
-    void *p = ::mmap(nullptr, 2*len, PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
-    if (p == MAP_FAILED){
+    void *p =
+        ::mmap(nullptr, 2 * len, PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
+    if (p == MAP_FAILED) {
       perror("mmap");
       return -1;
     }
-    munmap(p, 2*len);
+    munmap(p, 2 * len);
 
-    _p1 = (char*)mmap(p, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
-    if (_p1 == MAP_FAILED){
+    _p1 = (char *)mmap(p, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+    if (_p1 == MAP_FAILED) {
       perror("mmap1");
       return -1;
     }
 
-    _p2 = (char*)mmap((char*)p + len, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
-    if (_p2 == MAP_FAILED){
+    _p2 = (char *)mmap((char *)p + len, len, PROT_WRITE, MAP_SHARED | MAP_FIXED,
+                       fd, 0);
+    if (_p2 == MAP_FAILED) {
       perror("mmap2");
       return -1;
     }
-    printf("pointer %p %p %p %ld\n", p, _p1, _p2, (char*)_p2 - (char*)_p1);
     _p1[0] = 'x';
-    printf("%c %c\n", _p1[0], _p2[0]);
+    printf("pointer %p %s: %p %p %p %ld %c %c\n", this, _shname.c_str(), p, _p1,
+           _p2, (char *)_p2 - (char *)_p1, _p1[0], _p2[0]);
     _len = len;
+    _p1[0] = 0;
     return 0;
   }
 
   char *_ptr;
   char *_p1;
   char *_p2;
-  int _len;
+  std::size_t _len;
   std::string _shname;
 };
 
@@ -214,7 +221,7 @@ struct RingBuffer {
 
   template <typename Sink>
   friend void AbslStringify(Sink &sink, const RingBuffer &buffer) {
-    absl::Format(&sink, "[(%zu, %zu)],[(%zu, %zu)]", buffer._filled_start,
+    absl::Format(&sink, "f:[(%zu, %zu)], n:[(%zu, %zu)]", buffer._filled_start,
                  buffer._filled_size, buffer._non_filled_start,
                  buffer._non_filled_size);
   }
@@ -226,8 +233,9 @@ struct RingBuffer {
   buffers_2<bytes_view> peek_span(int len) const;
 
 private:
-  std::size_t _size;
   LinnearArray _data;
+  // std::vector<char> _data;
+  std::size_t _size;
   std::size_t _filled_start;
   std::size_t _filled_size;
   std::size_t _non_filled_start;

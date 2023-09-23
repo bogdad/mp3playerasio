@@ -2,6 +2,8 @@
 asio/1.28.1
 abseil/20230125.3
 minimp3/cci.20211201
+catch2/3.4.0
+
 [generators]
 CMakeDeps
 CMakeToolchain

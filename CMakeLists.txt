@@ -25,7 +25,9 @@ add_library(protocol src/protocol.cpp)
 target_include_directories(protocol 
 	PUBLIC include)
 target_link_libraries(protocol 
-	PRIVATE asio::asio absl::base absl::any_invocable absl::log)
+	PRIVATE 
+	PUBLIC absl::base absl::any_invocable absl::log asio::asio
+)
 
 add_library(mp3 src/mp3.cpp)
 target_include_directories(mp3 PUBLIC include)
@@ -44,3 +46,6 @@ target_include_directories(asio-client
 	PUBLIC include)
 target_link_libraries(asio-client 
 	PRIVATE protocol asio::asio absl::strings)
+
+
+add_subdirectory(test)

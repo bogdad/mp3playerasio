@@ -23,19 +23,16 @@ namespace am {
 struct Mp3Stream::Pimpl {
   mp3dec_t mp3d{};
 
-  Pimpl() {
-    mp3dec_init(&mp3d);
-  }
+  Pimpl() { mp3dec_init(&mp3d); }
 
   void decode_next() {
     mp3dec_frame_info_t info;
     short pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
     /*unsigned char *input_buf; - input byte stream*/
-    //int samples = mp3dec_decode_frame(&mp3d, input_buf, buf_size, pcm, &info);
+    // int samples = mp3dec_decode_frame(&mp3d, input_buf, buf_size, pcm,
+    // &info);
   }
 };
-
-
 
 Mp3 Mp3::create(fs::path filepath) {
   LOG(INFO) << "filepath " << filepath;
@@ -88,7 +85,5 @@ void file_view::consume(size_t l) {
     std::terminate();
   _current += l;
 }
-
-
 
 } // namespace am

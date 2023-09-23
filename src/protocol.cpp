@@ -13,11 +13,8 @@
 namespace am {
 
 RingBuffer::RingBuffer(std::size_t size)
-    : _size(size), _data(size), _filled_start(0), _filled_size(0),
-      _non_filled_start(0), _non_filled_size(size) {
-        _size = _data.len();
-        _non_filled_size = _data.len();
-      }
+    : _data(size), _size(_data.size()), _filled_start(0), _filled_size(0),
+      _non_filled_start(0), _non_filled_size(_data.size()) {}
 
 void RingBuffer::reset() {
   _filled_start = 0;
@@ -29,23 +26,15 @@ void RingBuffer::reset() {
 void RingBuffer::commit(std::size_t len) {
   _non_filled_size += len;
   _filled_size -= len;
-  auto left_to_the_right = _size - _filled_start;
-  if (_filled_size > left_to_the_right) {
-    _filled_start = _filled_size - left_to_the_right;
-  } else {
-    _filled_start += len;
-  }
+  _filled_start += len;
+  _filled_start %= _size;
 }
 
 void RingBuffer::consume(std::size_t len) {
   _filled_size += len;
   _non_filled_size -= len;
-  auto left_to_the_right = _size - _non_filled_start;
-  if (_non_filled_size > left_to_the_right) {
-    _non_filled_start = _non_filled_size - left_to_the_right;
-  } else {
-    _non_filled_start += len;
-  }
+  _non_filled_start += len;
+  _non_filled_start %= _size;
 }
 
 void RingBuffer::memcpy_in(const void *data, size_t sz) {

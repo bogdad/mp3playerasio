@@ -57,7 +57,7 @@ void my_handler(int s) { should_stop = 1; }
 
 class infinite_timer {
 public:
-  static constexpr auto interval = asio::chrono::seconds(10);
+  static constexpr auto interval = asio::chrono::seconds(3);
   infinite_timer(asio::io_context &io_context) : timer_(io_context, interval) {
     start();
   }
@@ -241,6 +241,7 @@ int main() {
     tcp_server server(io_context);
     const infinite_timer timer(io_context);
     while (!should_stop) {
+      LOG(INFO) << "run one";
       io_context.run_one();
     }
   } catch (std::exception &e) {
