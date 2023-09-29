@@ -27,8 +27,8 @@ Protocol:
 
 client connects
 server sends time
-sends some message
-server sends mp3
+client asks to send offset
+server sends mp3 offset
 
  */
 

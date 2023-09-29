@@ -17,6 +17,8 @@ if(UBSAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=undefined")
 endif()
 
+find_library(COREAUDIO_LIBRARY CoreAudio)
+
 find_package(asio REQUIRED)
 find_package(absl REQUIRED)
 find_package(minimp3 REQUIRED)
@@ -32,7 +34,11 @@ target_link_libraries(protocol
 add_library(mp3 src/mp3.cpp)
 target_include_directories(mp3 PUBLIC include)
 target_link_libraries(mp3 
-	PRIVATE asio::asio absl::any_invocable absl::log minimp3::minimp3)
+	PRIVATE asio::asio absl::any_invocable absl::log)
+
+add_library(audio-player src/audio-player.cpp)
+target_include_directories(audio-player PUBLIC include)
+target_link_libraries(audio-player PRIVATE asio::asio absl::log minimp3::minimp3 ${COREAUDIO_LIBRARY})
 
 add_executable(asio-server 
 	src/asio-server.cpp src/server-protocol.cpp)
@@ -45,7 +51,7 @@ add_executable(asio-client
 target_include_directories(asio-client 
 	PUBLIC include)
 target_link_libraries(asio-client 
-	PRIVATE protocol asio::asio absl::strings)
+	PRIVATE protocol audio-player asio::asio absl::strings)
 
 
 add_subdirectory(test)

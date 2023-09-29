@@ -1,6 +1,7 @@
 #pragma once
 
 #include <absl/functional/any_invocable.h>
+#include <absl/log/log.h>
 #include <algorithm>
 #include <asio.hpp>
 #include <asio/error_code.hpp>
@@ -10,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <optional>
+
 
 namespace am {
 
@@ -31,7 +33,7 @@ struct file_view {
 struct Mp3 {
 
   static Mp3 create(fs::path filepath);
-  size_t size() const;
+  std::size_t size() const;
   int send_chunk(const asio::ip::tcp::socket &socket);
   bool is_all_sent() const;
 
@@ -41,33 +43,9 @@ private:
   int call_sendfile(const asio::ip::tcp::socket &socket, off_t &len);
 
   fhandle _fd;
-  size_t _size;
+  std::size_t _size;
   bool _started{false};
   file_view _current;
-};
-
-struct Mp3Stream {
-  struct Pimpl;
-  std::unique_ptr<Pimpl> _pimpl;
-};
-
-struct Mp3Frame {
-
-  std::size_t length() const;
-
-  std::byte audio_version_id : 3;
-  std::byte layer_description : 2;
-  std::byte protection_bit : 1;
-  std::byte bitrate_index : 4;
-  int bitrate;
-  std::byte sampling_rate_frequency_index : 2;
-  int sampling_rate;
-  std::byte padding_bit : 1;
-  std::byte channel_mode : 2;
-  std::byte mode_extension : 2;
-  std::byte copyright : 1;
-  std::byte original : 1;
-  std::byte emphasis : 2;
 };
 
 } // namespace am

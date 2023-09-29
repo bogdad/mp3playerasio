@@ -21,6 +21,7 @@
 #include <thread>
 #include <utility>
 
+#include "audio-player.hpp"
 #include "client-protocol.hpp"
 #include "protocol.hpp"
 
@@ -32,9 +33,9 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
 
   using Pointer = std::shared_ptr<TcpClientConnection>;
 
-  static TcpClientConnection::Pointer create(asio::io_context &io_context) {
+  static TcpClientConnection::Pointer create(asio::io_context &io_context, Mp3Stream& mp3stream) {
     return std::shared_ptr<TcpClientConnection>(
-        new TcpClientConnection(io_context));
+        new TcpClientConnection(io_context, mp3stream));
   }
 
   void on_connect(asio::ip::tcp::endpoint endpoint) {
@@ -50,7 +51,7 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
   tcp::socket &socket() { return _socket; }
 
 private:
-  TcpClientConnection(asio::io_context &io_context)
+  TcpClientConnection(asio::io_context &io_context, Mp3Stream &mp3stream)
       : _socket(io_context), _read_buffer(8388608),
         _out_file("./out.mp3", std::ofstream::binary),
         _client_decoder(
@@ -98,6 +99,7 @@ private:
   ClientEncoder _client_encoder{};
   std::ofstream _out_file;
   ClientDecoder _client_decoder;
+  Mp3Stream _mp3_stream;
 };
 
 } // namespace am
@@ -113,11 +115,14 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   asio::io_context io_context;
+  
+  Mp3Stream mp3stream;
+
   tcp::resolver resolver(io_context);
   // tcp::resolver::results_type endpoints = resolver.resolve(argv[1], "8060");
   resolver.async_resolve(
-      argv[1], "8060", [&io_context](const asio::error_code &, auto results) {
-        auto connection = TcpClientConnection::create(io_context);
+      argv[1], "8060", [&io_context, &mp3stream](const asio::error_code &, auto results) {
+        auto connection = TcpClientConnection::create(io_context, mp3stream);
         asio::async_connect(
             connection->socket(), results,
             [connection = std::move(connection)](auto ec, auto endpoint) {

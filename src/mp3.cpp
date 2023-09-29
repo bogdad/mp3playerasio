@@ -14,25 +14,11 @@
 #include <span>
 #include <sys/socket.h>
 
-#define MINIMP3_IMPLEMENTATION
-#define MINIMP3_ONLY_MP3
-#include <minimp3.h>
+
 
 namespace am {
 
-struct Mp3Stream::Pimpl {
-  mp3dec_t mp3d{};
 
-  Pimpl() { mp3dec_init(&mp3d); }
-
-  void decode_next() {
-    mp3dec_frame_info_t info;
-    short pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
-    /*unsigned char *input_buf; - input byte stream*/
-    // int samples = mp3dec_decode_frame(&mp3d, input_buf, buf_size, pcm,
-    // &info);
-  }
-};
 
 Mp3 Mp3::create(fs::path filepath) {
   LOG(INFO) << "filepath " << filepath;
@@ -41,8 +27,7 @@ Mp3 Mp3::create(fs::path filepath) {
     std::terminate();
   }
   auto sz = std::filesystem::file_size(filepath);
-  FILE *fd = fopen(filepath.c_str(), "rb");
-  fhandle f{fd};
+  fhandle f{fopen(filepath.c_str(), "rb")};
 
   return {std::move(f), sz};
 }
@@ -85,5 +70,9 @@ void file_view::consume(size_t l) {
     std::terminate();
   _current += l;
 }
+
+
+
+
 
 } // namespace am
