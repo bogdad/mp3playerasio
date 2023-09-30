@@ -169,6 +169,12 @@ buffers_2<std::span<const char>> RingBuffer::peek_span(int len) const {
   }
 }
 
+std::span<char> RingBuffer::peek_linear_span(int len) {
+  check(len, "peek_linear_span");
+  static_assert(std::same_as<LinnearArray, decltype(_data)>, "_data should be linear array, to support liear view");
+  return {_data.data(), static_cast<std::size_t>(len)};
+}
+
 void Envelope::log() {
   LOG(INFO) << "envelope message type " << message_type << " message size "
             << message_size;

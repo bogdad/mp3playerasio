@@ -17,13 +17,13 @@ using bytes_view = std::span<const char>;
 
 struct ClientDecoder : Decoder {
   ClientDecoder(absl::AnyInvocable<void(buffers_2<std::string_view>)> &&on_time,
-                absl::AnyInvocable<void(buffers_2<bytes_view>)> &&on_mp3_bytes)
+                absl::AnyInvocable<void(RingBuffer&)> &&on_mp3_bytes)
       : _on_time(std::move(on_time)), _on_mp3_bytes(std::move(on_mp3_bytes)) {}
 
   void try_read_client(RingBuffer &state);
 
   absl::AnyInvocable<void(buffers_2<std::string_view>)> _on_time;
-  absl::AnyInvocable<void(buffers_2<bytes_view>)> _on_mp3_bytes;
+  absl::AnyInvocable<void(RingBuffer&)> _on_mp3_bytes;
 };
 
 struct ClientEncoder : Encoder {

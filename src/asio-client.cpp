@@ -64,13 +64,8 @@ private:
 
               std::this_thread::sleep_for(std::chrono::seconds(rand_delay));
             },
-            [this](buffers_2<bytes_view> ts) {
-              int b = 0;
-              for (auto spn : ts) {
-                LOG(INFO) << "client writing buff " << b++ << " size "
-                          << spn.size();
-                _out_file.write(spn.data(), spn.size());
-              }
+            [this](RingBuffer &buff) {
+              _mp3_stream.decode_next(buff);
             }) {}
 
   void
