@@ -168,9 +168,9 @@ private:
   DestructionSignaller _destruction_signaller {"tcp_connection"};
 };
 
-class tcp_server {
+class TcpServer {
 public:
-  tcp_server(asio::io_context &io_context)
+  TcpServer(asio::io_context &io_context)
       : io_context_(io_context),
         acceptor_(io_context, tcp::endpoint(tcp::v4(), 8060)) {
     start_accept();
@@ -212,7 +212,7 @@ int main() {
     signals.async_wait( [&should_stop](const asio::error_code ec, int signal){
       should_stop = 1;
     });
-    tcp_server server(io_context);
+    TcpServer server(io_context);
     const infinite_timer timer(io_context);
     while (!should_stop) {
       LOG(INFO) << "run one";
