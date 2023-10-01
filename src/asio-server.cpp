@@ -49,17 +49,17 @@ static std::string make_daytime_string() {
   return ctime(&now);
 }
 
-class tcp_connection : public std::enable_shared_from_this<tcp_connection> {
+class TcpConnection : public std::enable_shared_from_this<TcpConnection> {
 public:
   static constexpr auto interval = asio::chrono::seconds(5);
-  using pointer = std::shared_ptr<tcp_connection>;
+  using pointer = std::shared_ptr<TcpConnection>;
 
   static pointer create(asio::io_context &io_context) {
     LOG(INFO) << "creating file";
     Mp3 file = Mp3::create(fs::path("./classical-triumphant-march-163852.mp3"));
 
-    return {new tcp_connection(io_context, std::move(file)),
-            [](tcp_connection *conn) {
+    return {new TcpConnection(io_context, std::move(file)),
+            [](TcpConnection *conn) {
               delete conn;
             }};
   }
@@ -72,7 +72,7 @@ public:
   }
 
 private:
-  tcp_connection(asio::io_context &io_context, Mp3 &&file)
+  TcpConnection(asio::io_context &io_context, Mp3 &&file)
       : socket_(io_context), timer_(io_context), buff_(1024),
         _file(std::move(file)),
         _server_decoder(
@@ -165,7 +165,7 @@ private:
   ServerEncoder _server_encoder{};
   RingBuffer _read_buffer{8388608};
   ServerDecoder _server_decoder;
-  DestructionSignaller _destruction_signaller {"tcp_connection"};
+  DestructionSignaller _destruction_signaller {"TcpConnection"};
 };
 
 class TcpServer {
@@ -178,8 +178,8 @@ public:
 
 private:
   void start_accept() {
-    tcp_connection::pointer new_connection =
-        tcp_connection::create(io_context_);
+    TcpConnection::pointer new_connection =
+        TcpConnection::create(io_context_);
     acceptor_.async_accept(
         new_connection->socket(),
         [this, new_connection](const asio::error_code &error) {
@@ -187,7 +187,7 @@ private:
         });
   }
 
-  void handle_accept(tcp_connection::pointer new_connection,
+  void handle_accept(TcpConnection::pointer new_connection,
                      const asio::error_code &error) {
     if (!error) {
       new_connection->start();
