@@ -64,7 +64,7 @@ public:
             }};
   }
 
-  tcp::socket &socket() { return socket_; }
+  tcp::socket &socket() { return _socket; }
 
   void start() {
     asio::error_code ec;
@@ -73,16 +73,16 @@ public:
 
 private:
   TcpConnection(asio::io_context &io_context, Mp3 &&file)
-      : socket_(io_context), timer_(io_context), buff_(1024),
+      : _socket(io_context), _timer(io_context), _buff(1024),
         _file(std::move(file)),
         _server_decoder(
             [this](buffers_2<std::string_view> msg) { on_message(msg); }) {}
 
   void send_date() {
-    message_ = make_daytime_string();
+    _message = make_daytime_string();
 
     auto ptr = shared_from_this();
-    _server_encoder.fill_time(message_, _write_buffer);
+    _server_encoder.fill_time(_message, _write_buffer);
 
     send([ptr]() { ptr->send_mp3(); },
          [](const asio::error_code &) { LOG(ERROR) << "send date error"; });
@@ -102,14 +102,14 @@ private:
   }
   void send_mp3_inner() {
     LOG(INFO) << "server: calling sendfile";
-    if (_file.send_chunk(socket_) == 0) {
+    if (_file.send_chunk(_socket) == 0) {
       if (_file.is_all_sent()) {
         asio::error_code ec{};
         // all done
-        socket_.close();
+        _socket.close();
       } else {
         auto ptr = shared_from_this();
-        socket_.async_write_some(
+        _socket.async_write_some(
             asio::null_buffers(),
             [ptr](const asio::error_code &error, size_t bytes_transferred) {
               ptr->send_mp3_inner();
@@ -117,8 +117,8 @@ private:
       }
     } else {
       LOG(ERROR) << "sendfile failed";
-      socket_.shutdown(asio::socket_base::shutdown_both);
-      socket_.close();
+      _socket.shutdown(asio::socket_base::shutdown_both);
+      _socket.close();
     };
   }
 
@@ -132,7 +132,7 @@ private:
   send(absl::AnyInvocable<void() const> &&continuation,
        absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {
     auto ptr = shared_from_this();
-    socket_.async_write_some(
+    _socket.async_write_some(
         _write_buffer.data(), [this, ptr, on_error = std::move(on_error),
                                continuation = std::move(continuation)](
                                   const asio::error_code &ec,
@@ -153,12 +153,12 @@ private:
         });
   }
 
-  tcp::socket socket_;
-  std::string message_;
-  asio::streambuf buff_;
-  char delim_ = '\0';
-  asio::steady_timer timer_;
-  bool was_timeout_{false};
+  tcp::socket _socket;
+  std::string _message;
+  asio::streambuf _buff;
+  char _delim = '\0';
+  asio::steady_timer _timer;
+  bool _was_timeout{false};
 
   Mp3 _file;
   RingBuffer _write_buffer{8388608};
@@ -171,16 +171,16 @@ private:
 class TcpServer {
 public:
   TcpServer(asio::io_context &io_context)
-      : io_context_(io_context),
-        acceptor_(io_context, tcp::endpoint(tcp::v4(), 8060)) {
+      : _io_context(io_context),
+        _acceptor(io_context, tcp::endpoint(tcp::v4(), 8060)) {
     start_accept();
   }
 
 private:
   void start_accept() {
     TcpConnection::pointer new_connection =
-        TcpConnection::create(io_context_);
-    acceptor_.async_accept(
+        TcpConnection::create(_io_context);
+    _acceptor.async_accept(
         new_connection->socket(),
         [this, new_connection](const asio::error_code &error) {
           this->handle_accept(new_connection, error);
@@ -196,8 +196,8 @@ private:
     start_accept();
   }
 
-  asio::io_context &io_context_;
-  tcp::acceptor acceptor_;
+  asio::io_context &_io_context;
+  tcp::acceptor _acceptor;
 };
 
 } // namespace am
