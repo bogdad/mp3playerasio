@@ -36,7 +36,7 @@ target_include_directories(mp3 PUBLIC include)
 target_link_libraries(mp3 
 	PRIVATE asio::asio absl::any_invocable absl::log)
 
-add_library(audio-player src/audio-player.cpp src/CARingBuffer.cpp)
+add_library(audio-player src/audio-player.cpp)
 target_include_directories(audio-player PUBLIC include)
 target_link_libraries(audio-player
 	PRIVATE asio::asio absl::log minimp3::minimp3 
