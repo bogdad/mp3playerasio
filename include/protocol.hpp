@@ -203,7 +203,7 @@ struct RingBuffer {
    */
   void commit(std::size_t len);
 
-  void enqueue_on_commit_func(on_commit_func &&func); 
+  void enqueue_on_commit_func(on_commit_func &&func) noexcept;
 
   /// Reduce nonfilled sequence by marking first size bytes of
   /// nonfilled sequence as filled sequence.

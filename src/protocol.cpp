@@ -40,7 +40,7 @@ void RingBuffer::commit(std::size_t len) {
   }
 }
 
-void RingBuffer::enqueue_on_commit_func(on_commit_func &&func) {
+void RingBuffer::enqueue_on_commit_func(on_commit_func &&func) noexcept {
   _on_commit_funcs.emplace_back(std::move(func));
 }
 
