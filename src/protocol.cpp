@@ -9,6 +9,8 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace am {
 
@@ -28,6 +30,18 @@ void RingBuffer::commit(std::size_t len) {
   _filled_size -= len;
   _filled_start += len;
   _filled_start %= _size;
+  std::vector<on_commit_func> on_commit_funcs;
+  std::swap(_on_commit_funcs, on_commit_funcs);
+  static_assert(std::same_as<std::vector<on_commit_func>, decltype(on_commit_funcs)>, "");
+  while(!on_commit_funcs.empty()) {
+    auto func = std::move(on_commit_funcs.back());
+    func();
+    on_commit_funcs.pop_back();
+  }
+}
+
+void RingBuffer::enqueue_on_commit_func(on_commit_func &&func) {
+  _on_commit_funcs.emplace_back(std::move(func));
 }
 
 void RingBuffer::consume(std::size_t len) {
@@ -172,7 +186,7 @@ buffers_2<std::span<const char>> RingBuffer::peek_span(int len) const {
 std::span<char> RingBuffer::peek_linear_span(int len) {
   check(len, "peek_linear_span");
   static_assert(std::same_as<LinnearArray, decltype(_data)>, "_data should be linear array, to support liear view");
-  return {_data.data(), static_cast<std::size_t>(len)};
+  return {&_data.at(_filled_start), static_cast<std::size_t>(len)};
 }
 
 void Envelope::log() {
@@ -211,5 +225,23 @@ void Decoder::reset() {
 void Encoder::fill_envelope(Envelope envelope, RingBuffer &buff) {
   buff.memcpy_in(&envelope, sizeof(envelope));
 }
+
+DestructionSignaller::~DestructionSignaller() {
+  LOG(INFO) << "destroying " << name;
+}
+
+static std::string make_daytime_string() {
+  using namespace std; // For time_t, time and ctime;
+  time_t now = time(nullptr);
+  return ctime(&now);
+}
+
+void infinite_timer::start() {
+    timer_.expires_at(timer_.expires_at() + interval);
+    timer_.async_wait([this](const asio::error_code &error) {
+      LOG(INFO) << "timer! " << make_daytime_string();
+      this->start();
+    });
+  }
 
 } // namespace am

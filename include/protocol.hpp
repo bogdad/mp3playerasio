@@ -34,10 +34,16 @@ server sends mp3 offset
 
 namespace am {
 
+struct DestructionSignaller {
+  std::string name;
+  ~DestructionSignaller();
+};
+
 using mutable_buffers = std::vector<asio::mutable_buffer>;
 using const_buffers = std::vector<asio::const_buffer>;
 
 using bytes_view = std::span<const char>;
+using on_commit_func = absl::AnyInvocable<void()>;
 
 template <typename Buffer> struct buffers_2 {
   using value_type = Buffer;
@@ -197,6 +203,8 @@ struct RingBuffer {
    */
   void commit(std::size_t len);
 
+  void enqueue_on_commit_func(on_commit_func &&func); 
+
   /// Reduce nonfilled sequence by marking first size bytes of
   /// nonfilled sequence as filled sequence.
   /**
@@ -241,6 +249,8 @@ private:
   std::size_t _filled_size;
   std::size_t _non_filled_start;
   std::size_t _non_filled_size;
+  std::vector<on_commit_func> _on_commit_funcs;
+  DestructionSignaller _destruction_signaller {"RingBuffer"};
 };
 
 struct Envelope {
@@ -261,5 +271,17 @@ struct Decoder {
 
 struct Encoder {
   void fill_envelope(Envelope envelope, RingBuffer &buff);
+};
+
+class infinite_timer {
+public:
+  static constexpr auto interval = asio::chrono::seconds(3);
+  infinite_timer(asio::io_context &io_context) : timer_(io_context, interval) {
+    start();
+  }
+
+private:
+  void start();
+  asio::steady_timer timer_;
 };
 } // namespace am

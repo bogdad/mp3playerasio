@@ -77,6 +77,8 @@ public:
   void          Allocate(int nChannels, UInt32 bytesPerFrame, UInt32 capacityFrames);
                 // capacityFrames will be rounded up to a power of 2
   void          Deallocate();
+
+  bool IsAllocated() const noexcept;
   
   CARingBufferError Store(const AudioBufferList *abl, UInt32 nFrames, SampleTime frameNumber);
               // Copy nFrames of data into the ring buffer at the specified sample time.

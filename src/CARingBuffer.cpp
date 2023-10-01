@@ -111,6 +111,10 @@ void  CARingBuffer::Deallocate()
   mCapacityFrames = 0;
 }
 
+bool CARingBuffer::IsAllocated() const noexcept {
+  return mBuffers;
+}
+
 inline void ZeroRange(Byte **buffers, int nchannels, int offset, int nbytes)
 {
   while (--nchannels >= 0) {

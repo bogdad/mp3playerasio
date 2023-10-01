@@ -24,6 +24,7 @@
 #include <asio/io_context.hpp>
 #include <asio/read.hpp>
 #include <asio/read_until.hpp>
+#include <asio/signal_set.hpp>
 #include <asio/steady_timer.hpp>
 #include <asio/streambuf.hpp>
 #include <atomic>
@@ -45,33 +46,11 @@ using asio::ip::tcp;
 
 namespace am {
 
-std::string make_daytime_string() {
+static std::string make_daytime_string() {
   using namespace std; // For time_t, time and ctime;
   time_t now = time(nullptr);
   return ctime(&now);
 }
-
-std::atomic_int should_stop = 0;
-
-void my_handler(int s) { should_stop = 1; }
-
-class infinite_timer {
-public:
-  static constexpr auto interval = asio::chrono::seconds(3);
-  infinite_timer(asio::io_context &io_context) : timer_(io_context, interval) {
-    start();
-  }
-
-private:
-  void start() {
-    timer_.expires_at(timer_.expires_at() + interval);
-    timer_.async_wait([this](const asio::error_code &error) {
-      std::cout << "timer! " << make_daytime_string() << std::endl;
-      this->start();
-    });
-  }
-  asio::steady_timer timer_;
-};
 
 class tcp_connection : public std::enable_shared_from_this<tcp_connection> {
 public:
@@ -84,7 +63,6 @@ public:
 
     return {new tcp_connection(io_context, std::move(file)),
             [](tcp_connection *conn) {
-              std::cout << "deleting " << conn << std::endl;
               delete conn;
             }};
   }
@@ -190,6 +168,7 @@ private:
   ServerEncoder _server_encoder{};
   RingBuffer _read_buffer{8388608};
   ServerDecoder _server_decoder;
+  DestructionSignaller _destruction_signaller {"tcp_connection"};
 };
 
 class tcp_server {
@@ -228,16 +207,14 @@ private:
 
 int main() {
   using namespace am;
-  struct sigaction sigIntHandler {};
 
-  sigIntHandler.sa_handler = my_handler;
-  sigemptyset(&sigIntHandler.sa_mask);
-  sigIntHandler.sa_flags = 0;
-
-  sigaction(SIGINT, &sigIntHandler, nullptr);
-
+  std::atomic_int should_stop = 0;
   try {
     asio::io_context io_context;
+    asio::signal_set signals{io_context, SIGINT};
+    signals.async_wait( [&should_stop](const asio::error_code ec, int signal){
+      should_stop = 1;
+    });
     tcp_server server(io_context);
     const infinite_timer timer(io_context);
     while (!should_stop) {

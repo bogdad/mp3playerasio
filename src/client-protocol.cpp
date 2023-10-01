@@ -20,7 +20,6 @@ void ClientDecoder::try_read_client(RingBuffer &state) {
       const auto read_size = std::min(static_cast<int>(state.ready_size()),
                                       _envelope.message_size);
       _on_mp3_bytes(state);
-      state.commit(read_size);
       if (state.ready_size() >= _envelope.message_size) {
         // finished the file
         reset();
