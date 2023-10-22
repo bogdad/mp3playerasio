@@ -63,6 +63,21 @@ void RingBuffer::memcpy_in(const void *data, size_t sz) {
   consume(sz);
 }
 
+void RingBuffer::memcpy_out(void *data, size_t sz) {
+  check(sz, "memcpy_out");
+
+
+  auto left_to_the_right = _size - _filled_start;
+  if (sz > left_to_the_right) {
+    std::memcpy(data, &_data.at(_filled_start), left_to_the_right);
+    std::memcpy(static_cast<char *>(data) + left_to_the_right, _data.data(),
+                sz - left_to_the_right);
+  } else {
+    std::memcpy(data, &_data.at(_non_filled_start), sz);
+  }
+  commit(sz);
+}
+
 RingBuffer::const_buffers_type RingBuffer::data() const {
   if (_filled_size == 0)
     return {};

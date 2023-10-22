@@ -82,32 +82,43 @@ struct Player {
     return res;
   } 
   void callback(AudioBufferList * ioData, const AudioTimeStamp *timestamp, UInt32 inNumberFrames) {
-      const int sine_frequency = 880.0;
-      double j = _starting_frame_count;
-      //  double cycleLength = 44100. / 2200./*frequency*/;
-      double cycle_length = 44100. / sine_frequency;
-      int frame = 0;
-      for (frame = 0; frame < inNumberFrames; ++frame) 
-      {
-        float *data = (float*)ioData->mBuffers[0].mData;
-        (data)[frame] = (Float32)sin (2 * M_PI * (j / cycle_length));
-        
-        // copy to right channel too
-        data = (float *)ioData->mBuffers[1].mData;
-        (data)[frame] = (Float32)sin (2 * M_PI * (j / cycle_length));
-        
-        j += 1.0;
-        if (j > cycle_length)
-          j -= cycle_length;
-      }
+    LOG(INFO) << "Player: callback";
+    const int sine_frequency = 880.0;
+    double j = _starting_frame_count;
+    //  double cycleLength = 44100. / 2200./*frequency*/;
+    double cycle_length = 44100. / sine_frequency;
+    
+    /*int frame = 0;
+    for (frame = 0; frame < inNumberFrames; ++frame) 
+    {
+      float *data = (float*)ioData->mBuffers[0].mData;
+      (data)[frame] = (Float32)sin (2 * M_PI * (j / cycle_length));
       
+      // copy to right channel too
+      data = (float *)ioData->mBuffers[1].mData;
+      (data)[frame] = (Float32)sin (2 * M_PI * (j / cycle_length));
+      
+      j += 1.0;
+      if (j > cycle_length)
+        j -= cycle_length;
+    }*/
+
+    auto channel_size = sizeof(float)*inNumberFrames;
+    _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size/2);
+    _output_buffer.memcpy_out(ioData->mBuffers[1].mData, channel_size/2);
+
+    
     _starting_frame_count = j;
   }
 void start() {
+  _started = true;
   CheckError (AudioOutputUnitStart(*_output_unit), "Couldn't start output unit");
 }
 RingBuffer &buffer() {
   return _output_buffer;
+}
+bool started() {
+  return _started;
 }
 private:
   Player(AudioUnitHandle output_unit): _output_unit(std::move(output_unit)), _output_buffer(128000) {}
@@ -130,6 +141,7 @@ private:
   AudioUnitHandle _output_unit;
   double _starting_frame_count {};
   RingBuffer _output_buffer;
+  std::atomic_bool _started{false};
 };
 
 
@@ -159,11 +171,8 @@ struct Mp3Stream::Pimpl {
     std::array<mp3d_sample_t, MINIMP3_MAX_SAMPLES_PER_FRAME> pcm;
     auto input_size = input.ready_size(); 
     auto input_buf = input.peek_linear_span(static_cast<int>(input_size));
-    
-    char pntr[200];
-    snprintf(pntr, 200, "%p", input_buf.data());
 
-    LOG(INFO) << "buf " << pntr << " size " << input_size;
+    LOG(INFO) << "decode_next: size " << input_size;
     int samples = mp3dec_decode_frame(&_mp3d, reinterpret_cast<uint8_t *>(input_buf.data()), input_size, pcm.data(), &info);
     LOG(INFO) << "received samples " << samples;
     if (info.frame_bytes) {
@@ -172,6 +181,9 @@ struct Mp3Stream::Pimpl {
     }
     if (samples) {
       _player->buffer().memcpy_in(pcm.data(), samples);
+      if (!_player->started()) {
+        _player->start();
+      }
     }
   }
 
