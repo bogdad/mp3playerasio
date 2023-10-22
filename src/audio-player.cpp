@@ -104,6 +104,7 @@ struct Player {
     }*/
 
     auto channel_size = sizeof(float)*inNumberFrames;
+    LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames;
     _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size/2);
     _output_buffer.memcpy_out(ioData->mBuffers[1].mData, channel_size/2);
 
@@ -172,12 +173,19 @@ struct Mp3Stream::Pimpl {
     auto input_size = input.ready_size(); 
     auto input_buf = input.peek_linear_span(static_cast<int>(input_size));
 
-    LOG(INFO) << "decode_next: size " << input_size;
+    LOG(INFO) << "decode_next: ready size " << input_size;
     int samples = mp3dec_decode_frame(&_mp3d, reinterpret_cast<uint8_t *>(input_buf.data()), input_size, pcm.data(), &info);
     LOG(INFO) << "received samples " << samples;
     if (info.frame_bytes) {
       LOG(INFO) << "committed " << info.frame_bytes;
       input.commit(info.frame_bytes);
+      if (input.ready_size() > 0) {
+        input.enqueue_on_commit_func([&input, this](){
+          // not cool, need to reschedule to the io thread from audio.
+          this->decode_next(input);
+        }
+        );
+      }
     }
     if (samples) {
       _player->buffer().memcpy_in(pcm.data(), samples);
