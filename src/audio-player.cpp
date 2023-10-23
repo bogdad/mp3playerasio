@@ -189,6 +189,7 @@ struct Mp3Stream::Pimpl {
       LOG(INFO) << "committed " << info.frame_bytes;
       input.commit(info.frame_bytes);
       if (input.ready_size() > 0) {
+        LOG(INFO) << "enqueue";
         _player->buffer().enqueue_on_commit_func([&input, this, &io_context, &strand](){
           // not cool, need to reschedule to the io thread from audio.
           LOG(INFO) << "reposting";
