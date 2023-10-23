@@ -9,6 +9,7 @@
 #include <asio/io_context.hpp>
 #include <asio/ip/tcp.hpp>
 #include <asio/registered_buffer.hpp>
+#include <asio/strand.hpp>
 #include <memory>
 
 #include "audio-player.hpp"
@@ -23,9 +24,9 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
 
   using Pointer = std::shared_ptr<TcpClientConnection>;
 
-  static TcpClientConnection::Pointer create(asio::io_context &io_context, Mp3Stream& mp3stream) {
+  static TcpClientConnection::Pointer create(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream& mp3stream) {
     return std::shared_ptr<TcpClientConnection>(
-        new TcpClientConnection(io_context, mp3stream));
+        new TcpClientConnection(io_context, strand, mp3stream));
   }
 
   void on_connect(asio::ip::tcp::endpoint endpoint) {
@@ -40,7 +41,7 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
   tcp::socket &socket() { return _socket; }
 
 private:
-  TcpClientConnection(asio::io_context &io_context, Mp3Stream &mp3stream)
+  TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream &mp3stream)
       : _socket(io_context), _read_buffer(8388608),
         _client_decoder(
             [this](buffers_2<std::string_view> ts) {
@@ -48,9 +49,9 @@ private:
                 LOG(INFO) << "time " << sv;
               }
             },
-            [this, &io_context](RingBuffer &buff) {
+            [this, &io_context, &strand](RingBuffer &buff) {
               LOG(INFO) << "client: received ring buff";
-              _mp3_stream.decode_next(buff, io_context);
+              _mp3_stream.decode_next(buff, io_context, strand);
             }) {}
 
   void
@@ -115,17 +116,18 @@ int main(int argc, char *argv[]) {
   std::atomic_int should_stop = 0;
 
   asio::io_context io_context;
-  asio::signal_set signals(io_context, SIGINT);
-  signals.async_wait( [&should_stop](const asio::error_code ec, int signal){
-    should_stop = 1;
-  });
+  asio::io_context::strand strand{io_context};
+  //asio::signal_set signals(io_context, SIGINT);
+  //signals.async_wait( [&should_stop](const asio::error_code ec, int signal){
+  // should_stop = 1;
+  //});
   
   Mp3Stream mp3stream;
   tcp::resolver resolver(io_context);
 
   resolver.async_resolve(
-    argv[1], "8060", [&io_context, &mp3stream](const asio::error_code &, auto results) {
-      auto connection = TcpClientConnection::create(io_context, mp3stream);
+    argv[1], "8060", [&io_context, &mp3stream, &strand](const asio::error_code &, auto results) {
+      auto connection = TcpClientConnection::create(io_context, strand, mp3stream);
       asio::async_connect(
           connection->socket(), results,
           [connection = std::move(connection)](auto ec, auto endpoint) {
@@ -133,10 +135,7 @@ int main(int argc, char *argv[]) {
           });
     });
   const infinite_timer timer(io_context);
-  while(should_stop==0) {
-    LOG(INFO) << "tick " << io_context.stopped();
-    io_context.run_one();
-  }
+  io_context.run();
   LOG(INFO) << "shutting down";
   fflush(stdout); fflush(stderr);
 

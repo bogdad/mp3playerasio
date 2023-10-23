@@ -1,4 +1,5 @@
 #include "protocol.hpp"
+#include <absl/strings/str_cat.h>
 #include <absl/utility/utility.h>
 #include <cstdio>
 #include <memory>
@@ -167,14 +168,14 @@ struct Mp3Stream::Pimpl {
 
   Pimpl(): _player(Player::create()) { mp3dec_init(&_mp3d); }
 
-  void decode_next(RingBuffer &input, asio::io_context &io_context) {
-    while ((input.ready_size() > 0) && (_decoded_frames < 200)) {
-      decode_next_inner(input, io_context);
+  void decode_next(RingBuffer &input, asio::io_context &io_context,  asio::io_context::strand &strand) {
+    while ((input.ready_size() > 0) && (_decoded_frames < 30)) {
+      decode_next_inner(input, io_context,  strand);
     }
     _decoded_frames = 0;
   }
 
-  void decode_next_inner(RingBuffer &input, asio::io_context &io_context) {
+  void decode_next_inner(RingBuffer &input, asio::io_context &io_context,  asio::io_context::strand &strand) {
     mp3dec_frame_info_t info;
     std::memset(&info, 0, sizeof(info));
     std::array<mp3d_sample_t, MINIMP3_MAX_SAMPLES_PER_FRAME> pcm;
@@ -188,9 +189,11 @@ struct Mp3Stream::Pimpl {
       LOG(INFO) << "committed " << info.frame_bytes;
       input.commit(info.frame_bytes);
       if (input.ready_size() > 0) {
-        _player->buffer().enqueue_on_commit_func([&input, this, &io_context](){
+        _player->buffer().enqueue_on_commit_func([&input, this, &io_context, &strand](){
           // not cool, need to reschedule to the io thread from audio.
-          asio::post([&input, this, &io_context](){this->decode_next(input, io_context);});
+          LOG(INFO) << "reposting";
+          strand.post([&input, this, &io_context, &strand](){
+            this->decode_next(input, io_context, strand);});
         }
         );
       }
@@ -199,7 +202,7 @@ struct Mp3Stream::Pimpl {
       _decoded_frames++;
       _player->buffer().memcpy_in(pcm.data(), info.frame_bytes);
     }
-    if (samples && _decoded_frames > 100) {
+    if (samples && _decoded_frames > 20) {
       if (!_player->started()) {
         LOG(INFO) << "starting player";
         _player->start();
@@ -212,8 +215,8 @@ struct Mp3Stream::Pimpl {
   int _decoded_frames {};
 };
 
-void Mp3Stream::decode_next(RingBuffer &input, asio::io_context &io_context) {
-  _pimpl->decode_next(input, io_context);
+void Mp3Stream::decode_next(RingBuffer &input, asio::io_context &io_context,  asio::io_context::strand &strand) {
+  _pimpl->decode_next(input, io_context, strand);
 }
 
 void Mp3Stream::PimplDeleter::operator()(Pimpl *pimpl) {
