@@ -48,9 +48,9 @@ private:
                 LOG(INFO) << "time " << sv;
               }
             },
-            [this](RingBuffer &buff) {
+            [this, &io_context](RingBuffer &buff) {
               LOG(INFO) << "client: received ring buff";
-              _mp3_stream.decode_next(buff);
+              _mp3_stream.decode_next(buff, io_context);
             }) {}
 
   void
