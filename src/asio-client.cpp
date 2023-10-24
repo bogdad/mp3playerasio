@@ -24,9 +24,9 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
 
   using Pointer = std::shared_ptr<TcpClientConnection>;
 
-  static TcpClientConnection::Pointer create(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream& mp3stream) {
+  static TcpClientConnection::Pointer create(asio::io_context &io_context, asio::io_context::strand &strand) {
     return std::shared_ptr<TcpClientConnection>(
-        new TcpClientConnection(io_context, strand, mp3stream));
+        new TcpClientConnection(io_context, strand));
   }
 
   void on_connect(asio::ip::tcp::endpoint endpoint) {
@@ -41,7 +41,7 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
   tcp::socket &socket() { return _socket; }
 
 private:
-  TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream &mp3stream)
+  TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand)
       : _socket(io_context), _read_buffer(8388608),
         _client_decoder(
             [this](buffers_2<std::string_view> ts) {
@@ -49,10 +49,9 @@ private:
                 LOG(INFO) << "time " << sv;
               }
             },
-            [this, &io_context, &strand](RingBuffer &buff) {
-              LOG(INFO) << "client: received ring buff";
-              _mp3_stream.decode_next(buff, io_context, strand);
-            }) {}
+            [this](RingBuffer &buff) {
+              _mp3_stream.decode_next();
+            }), _mp3_stream(_read_buffer, io_context, strand) {}
 
   void
   receive(absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {
@@ -122,12 +121,11 @@ int main(int argc, char *argv[]) {
   // should_stop = 1;
   //});
   
-  Mp3Stream mp3stream;
   tcp::resolver resolver(io_context);
 
   resolver.async_resolve(
-    argv[1], "8060", [&io_context, &mp3stream, &strand](const asio::error_code &, auto results) {
-      auto connection = TcpClientConnection::create(io_context, strand, mp3stream);
+    argv[1], "8060", [&io_context, &strand](const asio::error_code &, auto results) {
+      auto connection = TcpClientConnection::create(io_context, strand);
       asio::async_connect(
           connection->socket(), results,
           [connection = std::move(connection)](auto ec, auto endpoint) {

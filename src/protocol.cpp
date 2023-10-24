@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstring>
 #include <exception>
+#include <mutex>
 #include <span>
 #include <string>
 #include <string_view>
@@ -24,6 +25,7 @@ void RingBuffer::reset() {
 }
 
 void RingBuffer::commit(std::size_t len) {
+  std::scoped_lock l(_mutex);
   _non_filled_size += len;
   _filled_size -= len;
   _filled_start += len;
@@ -39,6 +41,7 @@ void RingBuffer::commit(std::size_t len) {
 }
 
 void RingBuffer::enqueue_on_commit_func(on_commit_func &&func) noexcept {
+  std::scoped_lock l(_mutex);
   _on_commit_funcs.emplace_back(std::move(func));
 }
 

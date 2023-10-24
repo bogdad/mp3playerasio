@@ -12,6 +12,7 @@
 #include <cstring>
 #include <exception>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <sstream>
 #include <string>
@@ -251,6 +252,7 @@ private:
   std::size_t _non_filled_size;
   std::vector<on_commit_func> _on_commit_funcs;
   DestructionSignaller _destruction_signaller {"RingBuffer"};
+  mutable std::mutex _mutex{};
 };
 
 struct Envelope {

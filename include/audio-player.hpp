@@ -11,8 +11,8 @@ namespace am {
 
 struct Mp3Stream {
 public:
-  Mp3Stream();
-  void decode_next(RingBuffer &input, asio::io_context &io_context,  asio::io_context::strand &strand);
+  Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand);
+  void decode_next();
 private:
   struct Pimpl;
   struct PimplDeleter {
