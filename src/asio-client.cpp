@@ -42,7 +42,7 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
 
 private:
   TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand)
-      : _socket(io_context), _read_buffer(8388608),
+      : _socket(io_context), _read_buffer(8388608, 20000),
         _client_decoder(
             [this](buffers_2<std::string_view> ts) {
               for (auto sv : ts) {

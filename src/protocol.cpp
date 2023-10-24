@@ -13,9 +13,9 @@
 
 namespace am {
 
-RingBuffer::RingBuffer(std::size_t size)
+RingBuffer::RingBuffer(std::size_t size, std::size_t low_watermark)
     : _data(size), _size(_data.size()), _filled_start(0), _filled_size(0),
-      _non_filled_start(0), _non_filled_size(_data.size()) {}
+      _non_filled_start(0), _non_filled_size(_data.size()), _low_watermark(low_watermark) {}
 
 void RingBuffer::reset() {
   _filled_start = 0;
@@ -140,6 +140,8 @@ RingBuffer::mutable_buffers_type RingBuffer::prepared(std::size_t max_size) {
 bool RingBuffer::empty() const { return _filled_size == 0; }
 
 std::size_t RingBuffer::ready_size() const { return _filled_size; }
+
+bool RingBuffer::below_watermark() const { return ready_size() < _low_watermark;}
 
 void RingBuffer::check(int len, std::string_view method) const {
   if (len > _filled_size) {

@@ -27,7 +27,7 @@ TEST_CASE("RingBuffer works", "[RingBuffer]") {
 
   size_t pagesize = ::sysconf(_SC_PAGESIZE);
 
-  RingBuffer buf(100);
+  RingBuffer buf(100, 20000);
   REQUIRE(buf.prepared().size() == pagesize);
   buf.consume(pagesize);
   REQUIRE(buf.prepared().size() == 0);

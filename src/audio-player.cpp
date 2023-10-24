@@ -62,7 +62,7 @@ static void CheckError(OSStatus error, const char *operation)
 }
 
 struct Player {
-  using OnLowWatermark = absl::AnyInvocable<void()>;
+  using OnLowWatermark = std::function<void()>;
 
   static std::unique_ptr<Player> create(OnLowWatermark &&on_low_watermark) {
     AudioComponentDescription outputcd = {0}; // 10.6 version
@@ -109,12 +109,16 @@ struct Player {
         j -= cycle_length;
     }*/
 
-    auto channel_size = 2*sizeof(float)*inNumberFrames;
+    auto channel_size = 2*inNumberFrames;
     LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
-    _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size/2);
-    _output_buffer.memcpy_out(ioData->mBuffers[1].mData, channel_size/2);
+    if (_output_buffer.ready_size() >= channel_size) {
+      _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size/2);
+      _output_buffer.memcpy_out(ioData->mBuffers[1].mData, channel_size/2);
+    } else {
+      stop();
+    }
     
-    if (_output_buffer.ready_size() < 5000) {
+    if (_output_buffer.below_watermark()) {
       _on_low_watermark();
     }
 
@@ -124,6 +128,10 @@ void start() {
   _started = true;
   CheckError (AudioOutputUnitStart(*_output_unit), "Couldn't start output unit");
 }
+void stop() {
+  _started = true;
+  CheckError (AudioOutputUnitStop(*_output_unit), "Couldn't stop output unit");
+}
 RingBuffer &buffer() {
   return _output_buffer;
 }
@@ -131,7 +139,7 @@ bool started() {
   return _started;
 }
 private:
-  Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000), _on_low_watermark(std::move(on_low_watermark)) {}
+  Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000), _on_low_watermark(std::move(on_low_watermark)) {}
   void set_callback() {
     AURenderCallbackStruct input;
     input.inputProc = SineWaveRenderProc;
@@ -177,12 +185,19 @@ struct Mp3Stream::Pimpl {
   Pimpl(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand): 
   _input(input), _io_context(io_context), _strand(strand), _player(Player::create(
     [this](){
-      _strand.post([this](){decode_next();});
+      LOG(INFO) << "Player: on_low_watermark " << _io_context.get_executor();
+      _strand.post([this](){
+        LOG(INFO) << "Player: on_low_watermark executed";
+        decode_next();
+      });
     })) { mp3dec_init(&_mp3d); }
 
   void decode_next() {
-    while ((_input.ready_size() > 0) && (_decoded_frames < 30)) {
+    while ((_input.ready_size() > 0) && (_player->buffer().below_watermark()) ) {
       decode_next_inner();
+    }
+    if (_input.ready_size() == 0) {
+      LOG(INFO) << "decode_next: empty input";
     }
     _decoded_frames = 0;
   }
@@ -203,7 +218,7 @@ struct Mp3Stream::Pimpl {
       _decoded_frames++;
       _player->buffer().memcpy_in(pcm.data(), info.frame_bytes);
     }
-    if (samples && _decoded_frames > 20) {
+    if (samples && !_player->buffer().below_watermark()) {
       if (!_player->started()) {
         LOG(INFO) << "starting player";
         _player->start();

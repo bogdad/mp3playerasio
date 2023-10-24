@@ -186,7 +186,7 @@ private:
 };
 
 struct RingBuffer {
-  RingBuffer(std::size_t size);
+  RingBuffer(std::size_t size, std::size_t low_watermark);
 
   using const_buffers_type = buffers_2<asio::const_buffer>;
   using mutable_buffers_type = buffers_2<asio::mutable_buffer>;
@@ -227,6 +227,7 @@ struct RingBuffer {
 
   bool empty() const;
   size_t ready_size() const;
+  bool below_watermark() const;
 
   template <typename Sink>
   friend void AbslStringify(Sink &sink, const RingBuffer &buffer) {
@@ -253,6 +254,7 @@ private:
   std::vector<on_commit_func> _on_commit_funcs;
   DestructionSignaller _destruction_signaller {"RingBuffer"};
   mutable std::mutex _mutex{};
+  std::size_t _low_watermark;
 };
 
 struct Envelope {
