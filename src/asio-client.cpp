@@ -116,6 +116,7 @@ int main(int argc, char *argv[]) {
 
   asio::io_context io_context;
   asio::io_context::strand strand{io_context};
+  asio::executor_work_guard<asio::io_context::executor_type> wg = asio::make_work_guard(io_context);
   //asio::signal_set signals(io_context, SIGINT);
   //signals.async_wait( [&should_stop](const asio::error_code ec, int signal){
   // should_stop = 1;
@@ -133,7 +134,9 @@ int main(int argc, char *argv[]) {
           });
     });
   const infinite_timer timer(io_context);
-  io_context.run();
+  while (!should_stop) {
+    io_context.run_one(); 
+  }
   LOG(INFO) << "shutting down";
   fflush(stdout); fflush(stderr);
 

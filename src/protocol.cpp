@@ -25,14 +25,17 @@ void RingBuffer::reset() {
 }
 
 void RingBuffer::commit(std::size_t len) {
-  std::scoped_lock l(_mutex);
-  _non_filled_size += len;
-  _filled_size -= len;
-  _filled_start += len;
-  _filled_start %= _size;
   std::vector<on_commit_func> on_commit_funcs;
-  std::swap(_on_commit_funcs, on_commit_funcs);
-  static_assert(std::same_as<std::vector<on_commit_func>, decltype(on_commit_funcs)>, "");
+  {
+    std::scoped_lock l(_mutex);
+    _non_filled_size += len;
+    _filled_size -= len;
+    _filled_start += len;
+    _filled_start %= _size;
+  
+    std::swap(_on_commit_funcs, on_commit_funcs);
+    static_assert(std::same_as<std::vector<on_commit_func>, decltype(on_commit_funcs)>, "");
+  }
   while(!on_commit_funcs.empty()) {
     auto func = std::move(on_commit_funcs.back());
     func();
