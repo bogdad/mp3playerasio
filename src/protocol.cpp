@@ -79,7 +79,7 @@ void RingBuffer::memcpy_out(void *data, size_t sz) {
     std::memcpy(static_cast<char *>(data) + left_to_the_right, _data.data(),
                 sz - left_to_the_right);
   } else {
-    std::memcpy(data, &_data.at(_non_filled_start), sz);
+    std::memcpy(data, &_data.at(_filled_start), sz);
   }
   commit(sz);
 }
