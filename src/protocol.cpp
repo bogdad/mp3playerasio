@@ -210,6 +210,10 @@ std::span<char> RingBuffer::peek_linear_span(int len) {
   return {&_data.at(_filled_start), static_cast<std::size_t>(len)};
 }
 
+std::size_t RingBuffer::peek_pos() const {
+  return _filled_start;
+}
+
 void Envelope::log() {
   LOG(INFO) << "envelope message type " << message_type << " message size "
             << message_size;

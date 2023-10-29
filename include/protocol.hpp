@@ -241,7 +241,8 @@ struct RingBuffer {
   int peek_int() const;
   buffers_2<std::string_view> peek_string_view(int len) const;
   buffers_2<bytes_view> peek_span(int len) const;
-  std::span<char> peek_linear_span(int len); 
+  std::span<char> peek_linear_span(int len);
+  std::size_t peek_pos() const;
 
 private:
   LinnearArray _data;

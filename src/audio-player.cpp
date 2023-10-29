@@ -8,6 +8,7 @@
 
 #include <absl/log/log.h>
 #include <AudioToolbox/AudioToolbox.h>
+#include <ostream>
 #include <utility>
 
 #define MINIMP3_IMPLEMENTATION
@@ -20,7 +21,7 @@
 
 namespace am {
 
-OSStatus SineWaveRenderProc(void *inRefCon,
+OSStatus CallbackRenderProc(void *inRefCon,
               AudioUnitRenderActionFlags *ioActionFlags,
               const AudioTimeStamp *inTimeStamp,
               UInt32 inBusNumber,
@@ -61,6 +62,29 @@ static void CheckError(OSStatus error, const char *operation)
   exit(1);
 }
 
+
+static void log_mp3_format(mp3dec_frame_info_t &info) {
+  LOG(INFO) << "mp3 format" << std::endl
+     << "sample rate       : " << info.hz << std::endl
+     << "channels          : " << info.channels << std::endl
+     << "bytes per frame   : " << info.frame_bytes << std::endl
+     << "bitrate           : " << info.bitrate_kbps << std::endl
+     << "frame_offset      : " << info.frame_offset << std::endl
+     << "frame_bytes       : " << info.frame_bytes << std::endl;
+}
+
+static void log_format(const AudioStreamBasicDescription& format) {
+  LOG(INFO) << "default format "
+     << "sample rate       : " << format.mSampleRate << std::endl
+     << "format ID         : " << format.mFormatID << std::endl
+     << "format flags      : " << format.mFormatFlags << std::endl
+     << "bytes per packet  : " << format.mBytesPerPacket << std::endl
+     << "frames per packet : " << format.mFramesPerPacket << std::endl
+     << "bytes per frame   : " << format.mBytesPerFrame << std::endl
+     << "channels per frame: " << format.mChannelsPerFrame << std::endl
+     << "bits per channel  : " << format.mBitsPerChannel;
+}
+
 struct Player {
   using OnLowWatermark = std::function<void()>;
 
@@ -84,7 +108,7 @@ struct Player {
     auto *player = new Player(std::move(audio_unit_handle), std::move(on_low_watermark)); 
     auto res = std::unique_ptr<Player>(player);
 
-    res->set_callback();
+    res->setup_unit();
     return res;
   } 
   void callback(AudioBufferList * ioData, const AudioTimeStamp *timestamp, UInt32 inNumberFrames) {
@@ -114,6 +138,8 @@ struct Player {
     if (_output_buffer.ready_size() >= channel_size) {
       _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size/2);
       _output_buffer.memcpy_out(ioData->mBuffers[1].mData, channel_size/2);
+      ioData->mBuffers[0].mDataByteSize = channel_size/2;
+      //ioData->mBuffers[1].mDataByteSize = channel_size/2;
     } else {
       stop();
     }
@@ -139,32 +165,77 @@ bool started() {
   return _started;
 }
 private:
-  Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000), _on_low_watermark(std::move(on_low_watermark)) {}
-  void set_callback() {
-    AURenderCallbackStruct input;
-    input.inputProc = SineWaveRenderProc;
-    input.inputProcRefCon = this;
-    CheckError(AudioUnitSetProperty(*_output_unit,
-                    kAudioUnitProperty_SetRenderCallback, 
-                    kAudioUnitScope_Input,
-                    0,
-                    &input, 
-                    sizeof(input)),
-           "AudioUnitSetProperty failed");
+  Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000), _on_low_watermark(std::move(on_low_watermark)) {
+    format_.mSampleRate = 44100;
+    format_.mFormatID = kAudioFormatLinearPCM;
+    format_.mFormatFlags = kLinearPCMFormatFlagIsPacked |
+                         kLinearPCMFormatFlagIsSignedInteger;
+    format_.mBitsPerChannel = 16;
+    format_.mChannelsPerFrame = 2;
+    format_.mFramesPerPacket = 1;
+    format_.mBytesPerPacket = (format_.mBitsPerChannel * format_.mChannelsPerFrame) / 8;
+    format_.mBytesPerFrame = format_.mBytesPerPacket;
+    format_.mReserved = 0;
+  }
+  void setup_unit() {
 
     // initialize unit
     CheckError (AudioUnitInitialize(*_output_unit),
         "Couldn't initialize output unit");
+
+
+    AURenderCallbackStruct input;
+    input.inputProc = CallbackRenderProc;
+    input.inputProcRefCon = this;
+    CheckError(AudioUnitSetProperty(*_output_unit,
+        kAudioUnitProperty_SetRenderCallback, 
+        kAudioUnitScope_Input,
+        0,
+        &input,
+        sizeof(input)),
+      "AudioUnitSetProperty failed: kAudioUnitProperty_SetRenderCallback");
+
+    unsigned int cur_format_size = sizeof(AudioStreamBasicDescription);
+    AudioStreamBasicDescription cur_format = {0};
+    CheckError(AudioUnitGetProperty(*_output_unit,
+                         kAudioUnitProperty_StreamFormat,
+                         kAudioUnitScope_Output,
+                         0,
+                         (void *)&cur_format,
+                         &cur_format_size), "AudioUnitGetProperty failed: kAudioUnitProperty_StreamFormat");
+    log_format(cur_format);
+
+    CheckError(AudioUnitSetProperty(*_output_unit,
+        kAudioUnitProperty_StreamFormat,
+        kAudioUnitScope_Input,
+        0,
+        &format_,
+        sizeof(format_)),
+      "AudioUnitSetProperty failed: kAudioUnitProperty_StreamFormat");
+
+    cur_format_size = sizeof(AudioStreamBasicDescription);
+    cur_format = {};
+    CheckError(AudioUnitGetProperty(*_output_unit,
+                         kAudioUnitProperty_StreamFormat,
+                         kAudioUnitScope_Output,
+                         0,
+                         (void *)&cur_format,
+                         &cur_format_size), "AudioUnitGetProperty failed: kAudioUnitProperty_StreamFormat");
+    log_format(cur_format);
+
+
+
   }
   AudioUnitHandle _output_unit;
   double _starting_frame_count {};
   RingBuffer _output_buffer;
   std::atomic_bool _started{false};
   OnLowWatermark _on_low_watermark;
+  AudioStreamBasicDescription format_;
 };
 
 
-OSStatus SineWaveRenderProc(void *inRefCon,
+OSStatus CallbackRenderProc(void *inRefCon,
               AudioUnitRenderActionFlags *ioActionFlags,
               const AudioTimeStamp *inTimeStamp,
               UInt32 inBusNumber,
@@ -211,6 +282,8 @@ struct Mp3Stream::Pimpl {
     auto input_buf = _input.peek_linear_span(static_cast<int>(input_size));
 
     int samples = mp3dec_decode_frame(&_mp3d, reinterpret_cast<uint8_t *>(input_buf.data()), input_size, pcm.data(), &info);
+    log_mp3_format(info);
+    LOG(INFO) << " input start offset " << _input.peek_pos();
     if (info.frame_bytes) {
       _input.commit(info.frame_bytes);
     }
