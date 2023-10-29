@@ -56,7 +56,6 @@ void RingBuffer::consume(std::size_t len) {
 }
 
 void RingBuffer::memcpy_in(const void *data, size_t sz) {
-  // std::memcpy(_arr.data() + _last_written, data, sz);
   auto left_to_the_right = _size - _non_filled_start;
   if (sz > left_to_the_right) {
     std::memcpy(&_data.at(_non_filled_start), data, left_to_the_right);
@@ -71,7 +70,6 @@ void RingBuffer::memcpy_in(const void *data, size_t sz) {
 
 void RingBuffer::memcpy_out(void *data, size_t sz) {
   check(sz, "memcpy_out");
-
 
   auto left_to_the_right = _size - _filled_start;
   if (sz > left_to_the_right) {

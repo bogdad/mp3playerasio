@@ -8,6 +8,7 @@
 
 #include <absl/log/log.h>
 #include <AudioToolbox/AudioToolbox.h>
+#include <mutex>
 #include <ostream>
 #include <utility>
 
@@ -136,8 +137,7 @@ struct Player {
     auto channel_size = 2*inNumberFrames;
     LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
     if (_output_buffer.ready_size() >= channel_size) {
-      _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size/2);
-      _output_buffer.memcpy_out(ioData->mBuffers[1].mData, channel_size/2);
+      _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size);
       ioData->mBuffers[0].mDataByteSize = channel_size/2;
       //ioData->mBuffers[1].mDataByteSize = channel_size/2;
     } else {
@@ -282,7 +282,8 @@ struct Mp3Stream::Pimpl {
     auto input_buf = _input.peek_linear_span(static_cast<int>(input_size));
 
     int samples = mp3dec_decode_frame(&_mp3d, reinterpret_cast<uint8_t *>(input_buf.data()), input_size, pcm.data(), &info);
-    log_mp3_format(info);
+    std::call_once(log_mp3_format_once_, [&info](){log_mp3_format(info);});
+
     LOG(INFO) << " input start offset " << _input.peek_pos();
     if (info.frame_bytes) {
       _input.commit(info.frame_bytes);
@@ -310,6 +311,7 @@ struct Mp3Stream::Pimpl {
   mp3dec_t _mp3d{};
   std::unique_ptr<Player> _player;
   int _decoded_frames {};
+  std::once_flag log_mp3_format_once_;
 };
 
 void Mp3Stream::decode_next() {
