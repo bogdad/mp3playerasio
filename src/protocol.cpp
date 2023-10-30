@@ -13,9 +13,9 @@
 
 namespace am {
 
-RingBuffer::RingBuffer(std::size_t size, std::size_t low_watermark)
+RingBuffer::RingBuffer(std::size_t size, std::size_t low_watermark, std::size_t high_watermark)
     : _data(size), _size(_data.size()), _filled_start(0), _filled_size(0),
-      _non_filled_start(0), _non_filled_size(_data.size()), _low_watermark(low_watermark) {}
+      _non_filled_start(0), _non_filled_size(_data.size()), _low_watermark(low_watermark), _high_watermark(high_watermark) {}
 
 void RingBuffer::reset() {
   _filled_start = 0;
@@ -25,27 +25,11 @@ void RingBuffer::reset() {
 }
 
 void RingBuffer::commit(std::size_t len) {
-  std::vector<on_commit_func> on_commit_funcs;
-  {
-    std::scoped_lock l(_mutex);
-    _non_filled_size += len;
-    _filled_size -= len;
-    _filled_start += len;
-    _filled_start %= _size;
-  
-    std::swap(_on_commit_funcs, on_commit_funcs);
-    static_assert(std::same_as<std::vector<on_commit_func>, decltype(on_commit_funcs)>, "");
-  }
-  while(!on_commit_funcs.empty()) {
-    auto func = std::move(on_commit_funcs.back());
-    func();
-    on_commit_funcs.pop_back();
-  }
-}
-
-void RingBuffer::enqueue_on_commit_func(on_commit_func &&func) noexcept {
   std::scoped_lock l(_mutex);
-  _on_commit_funcs.emplace_back(std::move(func));
+  _non_filled_size += len;
+  _filled_size -= len;
+  _filled_start += len;
+  _filled_start %= _size;
 }
 
 void RingBuffer::consume(std::size_t len) {

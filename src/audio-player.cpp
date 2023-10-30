@@ -4,6 +4,8 @@
 #include <absl/utility/utility.h>
 #include <asio/io_context.hpp>
 #include <cstdio>
+#include <functional>
+#include <iterator>
 #include <memory>
 
 #include <absl/log/log.h>
@@ -113,7 +115,7 @@ struct Player {
     return res;
   } 
   void callback(AudioBufferList * ioData, const AudioTimeStamp *timestamp, UInt32 inNumberFrames) {
-    LOG(INFO) << "Player: callback";
+    // LOG(DEBUG) << "Player: callback";
     const int sine_frequency = 880.0;
     double j = _starting_frame_count;
     //  double cycleLength = 44100. / 2200./*frequency*/;
@@ -135,11 +137,10 @@ struct Player {
     }*/
 
     auto channel_size = 2*inNumberFrames;
-    LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
+    // LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
     if (_output_buffer.ready_size() >= channel_size) {
       _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size);
-      ioData->mBuffers[0].mDataByteSize = channel_size/2;
-      //ioData->mBuffers[1].mDataByteSize = channel_size/2;
+      ioData->mBuffers[0].mDataByteSize = channel_size;
     } else {
       stop();
     }
@@ -165,7 +166,7 @@ bool started() {
   return _started;
 }
 private:
-  Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000), _on_low_watermark(std::move(on_low_watermark)) {
+  Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000, 40000), _on_low_watermark(std::move(on_low_watermark)) {
     format_.mSampleRate = 44100;
     format_.mFormatID = kAudioFormatLinearPCM;
     format_.mFormatFlags = kLinearPCMFormatFlagIsPacked |
@@ -242,7 +243,7 @@ OSStatus CallbackRenderProc(void *inRefCon,
               UInt32 inNumberFrames,
               AudioBufferList * ioData) {
   
-  LOG(INFO) << "SineWaveRenderProc flags " << *ioActionFlags << " needs " << inNumberFrames << " frames at " << CFAbsoluteTimeGetCurrent();
+  // LOG(DEBUG) << "CallbackRenderProc flags " << *ioActionFlags << " needs " << inNumberFrames << " frames at " << CFAbsoluteTimeGetCurrent();
   auto *player = static_cast<Player *>(inRefCon);
   player->callback(ioData, inTimeStamp, inNumberFrames);
   
@@ -253,13 +254,14 @@ OSStatus CallbackRenderProc(void *inRefCon,
 
 struct Mp3Stream::Pimpl {
 
-  Pimpl(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand): 
+  Pimpl(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand, OnLowWatermark &&on_low_watermark): 
   _input(input), _io_context(io_context), _strand(strand), _player(Player::create(
     [this](){
       asio::post(_io_context, [this](){
         decode_next();
       });
-    })) { mp3dec_init(&_mp3d); }
+    })), _on_low_watermark(std::move(on_low_watermark)) {
+     mp3dec_init(&_mp3d); }
 
   void decode_next() {
     while ((_input.ready_size() > 0) && (_player->buffer().below_watermark()) ) {
@@ -280,11 +282,13 @@ struct Mp3Stream::Pimpl {
     auto input_buf = _input.peek_linear_span(static_cast<int>(input_size));
 
     int samples = mp3dec_decode_frame(&_mp3d, reinterpret_cast<uint8_t *>(input_buf.data()), input_size, pcm.data(), &info);
-    std::call_once(log_mp3_format_once_, [&info](){log_mp3_format(info);});
+    std::call_once(_log_mp3_format_once, [&info](){log_mp3_format(info);});
 
-    LOG(INFO) << " input start offset " << _input.peek_pos();
     if (info.frame_bytes) {
       _input.commit(info.frame_bytes);
+    }
+    if (_input.below_watermark()) {
+      _on_low_watermark();
     }
     if (samples) {
       _decoded_frames++;
@@ -299,7 +303,7 @@ struct Mp3Stream::Pimpl {
   }
 
   void log_state() {
-    LOG(INFO) << "input ready " << _input.ready_size() << " output ready " << _player->buffer().ready_size();
+    // LOG(INFO) << "input ready " << _input.ready_size() << " output ready " << _player->buffer().ready_size();
   }
 
   RingBuffer &_input;
@@ -309,7 +313,8 @@ struct Mp3Stream::Pimpl {
   mp3dec_t _mp3d{};
   std::unique_ptr<Player> _player;
   int _decoded_frames {};
-  std::once_flag log_mp3_format_once_;
+  std::once_flag _log_mp3_format_once;
+  OnLowWatermark _on_low_watermark;
 };
 
 void Mp3Stream::decode_next() {
@@ -320,6 +325,6 @@ void Mp3Stream::PimplDeleter::operator()(Pimpl *pimpl) {
   delete pimpl;
 }
 
-Mp3Stream::Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand):_pimpl(new Pimpl(input, io_context, strand)) {}
+Mp3Stream::Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand, OnLowWatermark &&on_low_watermark):_pimpl(new Pimpl(input, io_context, strand, std::move(on_low_watermark))) {}
 
 } // namespace am

@@ -43,7 +43,6 @@ using mutable_buffers = std::vector<asio::mutable_buffer>;
 using const_buffers = std::vector<asio::const_buffer>;
 
 using bytes_view = std::span<const char>;
-using on_commit_func = absl::AnyInvocable<void()>;
 
 template <typename Buffer> struct buffers_2 {
   using value_type = Buffer;
@@ -186,7 +185,7 @@ private:
 };
 
 struct RingBuffer {
-  RingBuffer(std::size_t size, std::size_t low_watermark);
+  RingBuffer(std::size_t size, std::size_t low_watermark, std::size_t high_watermark);
 
   using const_buffers_type = buffers_2<asio::const_buffer>;
   using mutable_buffers_type = buffers_2<asio::mutable_buffer>;
@@ -202,8 +201,6 @@ struct RingBuffer {
    * size bytes.
    */
   void commit(std::size_t len);
-
-  void enqueue_on_commit_func(on_commit_func &&func) noexcept;
 
   /// Reduce nonfilled sequence by marking first size bytes of
   /// nonfilled sequence as filled sequence.
@@ -252,10 +249,10 @@ private:
   std::size_t _filled_size;
   std::size_t _non_filled_start;
   std::size_t _non_filled_size;
-  std::vector<on_commit_func> _on_commit_funcs;
   DestructionSignaller _destruction_signaller {"RingBuffer"};
   mutable std::mutex _mutex{};
   std::size_t _low_watermark;
+  std::size_t _high_watermark;
 };
 
 struct Envelope {

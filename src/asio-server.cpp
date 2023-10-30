@@ -161,9 +161,9 @@ private:
   bool _was_timeout{false};
 
   Mp3 _file;
-  RingBuffer _write_buffer{8388608, 20000};
+  RingBuffer _write_buffer{8388608, 20000, 40000};
   ServerEncoder _server_encoder{};
-  RingBuffer _read_buffer{8388608, 20000};
+  RingBuffer _read_buffer{8388608, 20000, 40000};
   ServerDecoder _server_decoder;
   DestructionSignaller _destruction_signaller {"TcpConnection"};
 };

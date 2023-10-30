@@ -42,7 +42,7 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
 
 private:
   TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand)
-      : _socket(io_context), _read_buffer(8388608, 20000),
+      : _socket(io_context), _read_buffer(8388608, 20000, 40000),
         _client_decoder(
             [this](buffers_2<std::string_view> ts) {
               for (auto sv : ts) {
@@ -51,7 +51,8 @@ private:
             },
             [this](RingBuffer &buff) {
               _mp3_stream.decode_next();
-            }), _mp3_stream(_read_buffer, io_context, strand) {}
+            }), _mp3_stream(_read_buffer, io_context, strand,
+            [this](){handle();}) {}
 
   void
   receive(absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {
@@ -65,9 +66,9 @@ private:
             LOG(INFO) << "client: received " << _read_buffer << " error " << ec 
               << " bytes available " << _socket.available();
             on_error(ec);
-            // we did not parse the whole read_buffer, we schedule a callback to be called once
+            // we did not parse the whole read_buffer yet, we schedule a callback to be called once
             // the consumer commits more of read_buffer.
-            enqueue_on_commit_func(std::move(ptr));
+            // make sure connection is alive at this point
           } else {
             ptr->_read_buffer.consume(bytes_transferred);
             LOG(INFO) << "client: received from network " << _read_buffer;
@@ -75,15 +76,6 @@ private:
             receive(std::move(on_error));
           }
         });
-  }
-
-  void enqueue_on_commit_func(std::shared_ptr<TcpClientConnection> &&ptr) {
-    if (_read_buffer.ready_size() > 0) {
-      _read_buffer.enqueue_on_commit_func([this, ptr = std::move(ptr)]() mutable {
-        handle();
-        enqueue_on_commit_func(std::move(ptr));
-      });
-    }
   }
 
   void handle() {
