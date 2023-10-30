@@ -137,11 +137,10 @@ struct Player {
         j -= cycle_length;
     }*/
 
-    auto channel_size = inNumberFrames;
-    // LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
+    auto channel_size = ioData->mBuffers[0].mDataByteSize;
+    LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
     if (_output_buffer.ready_size() >= channel_size) {
       _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size);
-      ioData->mBuffers[0].mDataByteSize = channel_size;
     } else {
       stop();
     }
@@ -170,27 +169,22 @@ private:
   Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000, 40000), _on_low_watermark(std::move(on_low_watermark)) {
     format_.mSampleRate = 44100;
     format_.mFormatID = kAudioFormatLinearPCM;
-    format_.mFormatFlags =  kLinearPCMFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
-    format_.mBitsPerChannel = 16;
+    format_.mFormatFlags =  kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
+    format_.mBitsPerChannel = 8;
     format_.mChannelsPerFrame = 2;
     format_.mFramesPerPacket = 1;
-    format_.mBytesPerPacket = (format_.mBitsPerChannel * format_.mChannelsPerFrame) / 8;
-    format_.mBytesPerFrame = format_.mBytesPerPacket;
+    format_.mBytesPerFrame = (format_.mBitsPerChannel * format_.mChannelsPerFrame) / 8;
+    format_.mBytesPerPacket = format_.mBytesPerFrame * format_.mFramesPerPacket;
     format_.mReserved = 0;
   }
   void setup_unit() {
-
-    // initialize unit
-    CheckError (AudioUnitInitialize(*_output_unit),
-        "Couldn't initialize output unit");
-
 
     AURenderCallbackStruct input;
     input.inputProc = CallbackRenderProc;
     input.inputProcRefCon = this;
     CheckError(AudioUnitSetProperty(*_output_unit,
         kAudioUnitProperty_SetRenderCallback, 
-        kAudioUnitScope_Input,
+        kAudioUnitScope_Global,
         0,
         &input,
         sizeof(input)),
@@ -200,7 +194,7 @@ private:
     AudioStreamBasicDescription cur_format = {0};
     CheckError(AudioUnitGetProperty(*_output_unit,
                          kAudioUnitProperty_StreamFormat,
-                         kAudioUnitScope_Input,
+                         kAudioUnitScope_Global,
                          0,
                          (void *)&cur_format,
                          &cur_format_size), "AudioUnitGetProperty failed: kAudioUnitProperty_StreamFormat");
@@ -218,14 +212,15 @@ private:
     cur_format = {};
     CheckError(AudioUnitGetProperty(*_output_unit,
                          kAudioUnitProperty_StreamFormat,
-                         kAudioUnitScope_Input,
+                         kAudioUnitScope_Global,
                          0,
                          (void *)&cur_format,
                          &cur_format_size), "AudioUnitGetProperty failed: kAudioUnitProperty_StreamFormat");
     log_format(cur_format);
 
-
-
+    // initialize unit
+    CheckError (AudioUnitInitialize(*_output_unit),
+        "Couldn't initialize output unit");
   }
   AudioUnitHandle _output_unit;
   double _starting_frame_count {};
