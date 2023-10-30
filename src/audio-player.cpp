@@ -256,9 +256,7 @@ struct Mp3Stream::Pimpl {
   Pimpl(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand): 
   _input(input), _io_context(io_context), _strand(strand), _player(Player::create(
     [this](){
-      LOG(INFO) << "Player: on_low_watermark " << _io_context.stopped();
       asio::post(_io_context, [this](){
-        LOG(INFO) << "Player: on_low_watermark executed";
         decode_next();
       });
     })) { mp3dec_init(&_mp3d); }
