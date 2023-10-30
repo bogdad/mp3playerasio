@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
             connection->on_connect(endpoint);
           });
     });
-  const infinite_timer timer(io_context);
+
   while (!should_stop) {
     io_context.run_one(); 
   }
