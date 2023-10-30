@@ -213,7 +213,6 @@ int main() {
       should_stop = 1;
     });
     TcpServer server(io_context);
-    const infinite_timer timer(io_context);
     while (!should_stop) {
       LOG(INFO) << "run one";
       io_context.run_one();

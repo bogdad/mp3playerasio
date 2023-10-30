@@ -199,7 +199,7 @@ private:
     AudioStreamBasicDescription cur_format = {0};
     CheckError(AudioUnitGetProperty(*_output_unit,
                          kAudioUnitProperty_StreamFormat,
-                         kAudioUnitScope_Output,
+                         kAudioUnitScope_Input,
                          0,
                          (void *)&cur_format,
                          &cur_format_size), "AudioUnitGetProperty failed: kAudioUnitProperty_StreamFormat");
@@ -217,7 +217,7 @@ private:
     cur_format = {};
     CheckError(AudioUnitGetProperty(*_output_unit,
                          kAudioUnitProperty_StreamFormat,
-                         kAudioUnitScope_Output,
+                         kAudioUnitScope_Input,
                          0,
                          (void *)&cur_format,
                          &cur_format_size), "AudioUnitGetProperty failed: kAudioUnitProperty_StreamFormat");
