@@ -75,6 +75,12 @@ private:
             // we did not parse the whole read_buffer yet, we schedule a callback to be called once
             // the consumer commits more of read_buffer.
             // make sure connection is alive at this point
+
+            // currently connection is alive because
+            // res->_mp3_stream.set_on_low_watermark([res](){
+            //   res->handle();
+            // });
+            // set on low watermark retains tcp connection strongly forever.
           } else {
             ptr->_read_buffer.consume(bytes_transferred);
             LOG(INFO) << "client: received from network " << _read_buffer;
