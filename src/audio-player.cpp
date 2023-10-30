@@ -115,11 +115,12 @@ struct Player {
     return res;
   } 
   void callback(AudioBufferList * ioData, const AudioTimeStamp *timestamp, UInt32 inNumberFrames) {
+    LOG(INFO) << "requested number of buffers " << ioData->mNumberBuffers;
     // LOG(DEBUG) << "Player: callback";
-    const int sine_frequency = 880.0;
-    double j = _starting_frame_count;
+    //const int sine_frequency = 880.0;
+    //double j = _starting_frame_count;
     //  double cycleLength = 44100. / 2200./*frequency*/;
-    double cycle_length = 44100. / sine_frequency;
+    //double cycle_length = 44100. / sine_frequency;
     
     /*int frame = 0;
     for (frame = 0; frame < inNumberFrames; ++frame) 
@@ -136,7 +137,7 @@ struct Player {
         j -= cycle_length;
     }*/
 
-    auto channel_size = 2*inNumberFrames;
+    auto channel_size = inNumberFrames;
     // LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
     if (_output_buffer.ready_size() >= channel_size) {
       _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size);
@@ -149,7 +150,7 @@ struct Player {
       _on_low_watermark();
     }
 
-    _starting_frame_count = j;
+    //_starting_frame_count = j;
   }
 void start() {
   _started = true;
@@ -169,8 +170,7 @@ private:
   Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000, 40000), _on_low_watermark(std::move(on_low_watermark)) {
     format_.mSampleRate = 44100;
     format_.mFormatID = kAudioFormatLinearPCM;
-    format_.mFormatFlags = kLinearPCMFormatFlagIsPacked |
-                         kLinearPCMFormatFlagIsSignedInteger;
+    format_.mFormatFlags =  kLinearPCMFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
     format_.mBitsPerChannel = 16;
     format_.mChannelsPerFrame = 2;
     format_.mFramesPerPacket = 1;
@@ -264,7 +264,7 @@ struct Mp3Stream::Pimpl {
      mp3dec_init(&_mp3d); }
 
   void decode_next() {
-    while ((_input.ready_size() > 0) && (_player->buffer().below_watermark()) ) {
+    while ((_input.ready_size() > 0) && (_player->buffer().below_high_watermark()) ) {
       decode_next_inner();
     }
     if (_input.ready_size() == 0) {
@@ -274,7 +274,9 @@ struct Mp3Stream::Pimpl {
   }
 
   void decode_next_inner() {
-    log_state();
+    if (_input.peek_pos() % 20 == 0) {
+      log_state();
+    }
     mp3dec_frame_info_t info;
     std::memset(&info, 0, sizeof(info));
     std::array<mp3d_sample_t, MINIMP3_MAX_SAMPLES_PER_FRAME> pcm;
@@ -284,16 +286,17 @@ struct Mp3Stream::Pimpl {
     int samples = mp3dec_decode_frame(&_mp3d, reinterpret_cast<uint8_t *>(input_buf.data()), input_size, pcm.data(), &info);
     std::call_once(_log_mp3_format_once, [&info](){log_mp3_format(info);});
 
-    if (info.frame_bytes) {
+    if (info.frame_bytes > 0) {
       _input.commit(info.frame_bytes);
+      if (samples) {
+        _decoded_frames++;
+        _player->buffer().memcpy_in(pcm.data(), info.frame_bytes);
+      }
     }
     if (_input.below_watermark()) {
       _on_low_watermark();
     }
-    if (samples) {
-      _decoded_frames++;
-      _player->buffer().memcpy_in(pcm.data(), info.frame_bytes);
-    }
+    
     if (samples && !_player->buffer().below_watermark()) {
       if (!_player->started()) {
         LOG(INFO) << "starting player";
@@ -303,7 +306,11 @@ struct Mp3Stream::Pimpl {
   }
 
   void log_state() {
-    // LOG(INFO) << "input ready " << _input.ready_size() << " output ready " << _player->buffer().ready_size();
+    LOG(INFO) << "input ready " << _input.ready_size() << " output ready " << _player->buffer().ready_size();
+  }
+
+  void set_on_low_watermark(OnLowWatermark &&fun) {
+    _on_low_watermark = std::move(fun);
   }
 
   RingBuffer &_input;
@@ -326,5 +333,8 @@ void Mp3Stream::PimplDeleter::operator()(Pimpl *pimpl) {
 }
 
 Mp3Stream::Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand, OnLowWatermark &&on_low_watermark):_pimpl(new Pimpl(input, io_context, strand, std::move(on_low_watermark))) {}
+void Mp3Stream::set_on_low_watermark(OnLowWatermark &&fun) {
+  _pimpl->set_on_low_watermark(std::move(fun));
+}
 
 } // namespace am

@@ -11,6 +11,7 @@
 #include <asio/registered_buffer.hpp>
 #include <asio/strand.hpp>
 #include <memory>
+#include <utility>
 
 #include "audio-player.hpp"
 #include "client-protocol.hpp"
@@ -25,8 +26,13 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
   using Pointer = std::shared_ptr<TcpClientConnection>;
 
   static TcpClientConnection::Pointer create(asio::io_context &io_context, asio::io_context::strand &strand) {
-    return std::shared_ptr<TcpClientConnection>(
-        new TcpClientConnection(io_context, strand));
+    auto res = std::shared_ptr<TcpClientConnection>(
+        new TcpClientConnection(io_context, strand, 
+            [](){}));
+    res->_mp3_stream.set_on_low_watermark([res](){
+      res->handle();
+    });
+    return res;
   }
 
   void on_connect(asio::ip::tcp::endpoint endpoint) {
@@ -41,7 +47,8 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
   tcp::socket &socket() { return _socket; }
 
 private:
-  TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand)
+  TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand,
+    Mp3Stream::OnLowWatermark &&on_low_watermark)
       : _socket(io_context), _read_buffer(8388608, 20000, 40000),
         _client_decoder(
             [this](buffers_2<std::string_view> ts) {
@@ -51,8 +58,7 @@ private:
             },
             [this](RingBuffer &buff) {
               _mp3_stream.decode_next();
-            }), _mp3_stream(_read_buffer, io_context, strand,
-            [this](){handle();}) {}
+            }), _mp3_stream(_read_buffer, io_context, strand, std::move(on_low_watermark)) {}
 
   void
   receive(absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {

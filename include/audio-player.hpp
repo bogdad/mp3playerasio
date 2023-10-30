@@ -13,6 +13,7 @@ struct Mp3Stream {
 public:
   using OnLowWatermark = std::function<void()>;
   Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand, OnLowWatermark &&on_low_watermark);
+  void set_on_low_watermark(OnLowWatermark &&);
   void decode_next();
 private:
   struct Pimpl;

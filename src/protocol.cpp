@@ -128,6 +128,8 @@ std::size_t RingBuffer::ready_size() const { return _filled_size; }
 
 bool RingBuffer::below_watermark() const { return ready_size() < _low_watermark;}
 
+bool RingBuffer::below_high_watermark() const { return ready_size() < _high_watermark;}
+
 void RingBuffer::check(int len, std::string_view method) const {
   if (len > _filled_size) {
     LOG(ERROR) << "RingBuffer " << method << ": cant read " << len

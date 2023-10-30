@@ -225,6 +225,7 @@ struct RingBuffer {
   bool empty() const;
   size_t ready_size() const;
   bool below_watermark() const;
+  bool below_high_watermark() const;
 
   template <typename Sink>
   friend void AbslStringify(Sink &sink, const RingBuffer &buffer) {
