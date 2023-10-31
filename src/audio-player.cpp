@@ -12,6 +12,7 @@
 #include <AudioToolbox/AudioToolbox.h>
 #include <mutex>
 #include <ostream>
+#include <span>
 #include <utility>
 
 #define MINIMP3_IMPLEMENTATION
@@ -115,30 +116,10 @@ struct Player {
     return res;
   } 
   void callback(AudioBufferList * ioData, const AudioTimeStamp *timestamp, UInt32 inNumberFrames) {
-    LOG(INFO) << "requested number of buffers " << ioData->mNumberBuffers;
-    // LOG(DEBUG) << "Player: callback";
-    //const int sine_frequency = 880.0;
-    //double j = _starting_frame_count;
-    //  double cycleLength = 44100. / 2200./*frequency*/;
-    //double cycle_length = 44100. / sine_frequency;
-    
-    /*int frame = 0;
-    for (frame = 0; frame < inNumberFrames; ++frame) 
-    {
-      float *data = (float*)ioData->mBuffers[0].mData;
-      (data)[frame] = (Float32)sin (2 * M_PI * (j / cycle_length));
-      
-      // copy to right channel too
-      data = (float *)ioData->mBuffers[1].mData;
-      (data)[frame] = (Float32)sin (2 * M_PI * (j / cycle_length));
-      
-      j += 1.0;
-      if (j > cycle_length)
-        j -= cycle_length;
-    }*/
+    // LOG(INFO) << "requested number of buffers " << ioData->mNumberBuffers;
 
     auto channel_size = ioData->mBuffers[0].mDataByteSize;
-    LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
+    // LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
     if (_output_buffer.ready_size() >= channel_size) {
       _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size);
     } else {
@@ -169,8 +150,8 @@ private:
   Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000, 40000), _on_low_watermark(std::move(on_low_watermark)) {
     format_.mSampleRate = 44100;
     format_.mFormatID = kAudioFormatLinearPCM;
-    format_.mFormatFlags =  kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
-    format_.mBitsPerChannel = 8;
+    format_.mFormatFlags =  kLinearPCMFormatFlagIsSignedInteger /*| kLinearPCMFormatFlagIsPacked*/;
+    format_.mBitsPerChannel = 16;
     format_.mChannelsPerFrame = 2;
     format_.mFramesPerPacket = 1;
     format_.mBytesPerFrame = (format_.mBitsPerChannel * format_.mChannelsPerFrame) / 8;
@@ -255,13 +236,14 @@ struct Mp3Stream::Pimpl {
       asio::post(_io_context, [this](){
         decode_next();
       });
-    })), _on_low_watermark(std::move(on_low_watermark)) {
+    })), _on_low_watermark(std::move(on_low_watermark))/*, _wav_file("./wav.wav", std::ios_base::out | std::ios_base::binary)*/ {
      mp3dec_init(&_mp3d); }
 
   void decode_next() {
     while ((_input.ready_size() > 0) && (_player->buffer().below_high_watermark()) ) {
       decode_next_inner();
     }
+    // _wav_file.flush();
     if (_input.ready_size() == 0) {
       LOG(INFO) << "decode_next: empty input";
     }
@@ -269,7 +251,7 @@ struct Mp3Stream::Pimpl {
   }
 
   void decode_next_inner() {
-    if (_input.peek_pos() % 20 == 0) {
+    if (_input.peek_pos() % 200 == 0) {
       log_state();
     }
     mp3dec_frame_info_t info;
@@ -285,7 +267,10 @@ struct Mp3Stream::Pimpl {
       _input.commit(info.frame_bytes);
       if (samples) {
         _decoded_frames++;
-        _player->buffer().memcpy_in(pcm.data(), info.frame_bytes);
+        size_t decoded_size = samples * sizeof(mp3d_sample_t);
+        // auto span = std::span{pcm.data(), decoded_size};
+        // _wav_file << span.data();
+        _player->buffer().memcpy_in(pcm.data(), decoded_size);
       }
     }
     if (_input.below_watermark()) {
@@ -317,6 +302,7 @@ struct Mp3Stream::Pimpl {
   int _decoded_frames {};
   std::once_flag _log_mp3_format_once;
   OnLowWatermark _on_low_watermark;
+  //std::ofstream _wav_file;
 };
 
 void Mp3Stream::decode_next() {
