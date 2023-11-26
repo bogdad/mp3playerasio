@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.15)
+cmake_minimum_required (VERSION 3.19)
 project (asio-example CXX)
 set(CMAKE_CXX_STANDARD 20)
 
@@ -17,18 +17,17 @@ if(UBSAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=undefined")
 endif()
 
-find_library(AUDIO_TOOLBOX_LIBRARY AudioToolbox)
-
 find_package(asio REQUIRED)
 find_package(absl REQUIRED)
 find_package(minimp3 REQUIRED)
+find_package(sdl2 REQUIRED)
 
 add_library(protocol src/protocol.cpp)
-target_include_directories(protocol 
+target_include_directories(protocol
 	PUBLIC include)
-target_link_libraries(protocol 
-	PRIVATE 
-	PUBLIC absl::base absl::any_invocable absl::log asio::asio
+target_link_libraries(protocol
+	PRIVATE absl::any_invocable
+	PUBLIC absl::base absl::log absl::core_headers asio::asio
 )
 
 add_library(mp3 src/mp3.cpp)
@@ -39,8 +38,7 @@ target_link_libraries(mp3
 add_library(audio-player src/audio-player.cpp)
 target_include_directories(audio-player PUBLIC include)
 target_link_libraries(audio-player
-	PRIVATE asio::asio absl::log minimp3::minimp3 
-	PUBLIC ${AUDIO_TOOLBOX_LIBRARY})
+	PRIVATE asio::asio absl::log minimp3::minimp3 SDL2::SDL2)
 
 add_executable(asio-server 
 	src/asio-server.cpp src/server-protocol.cpp)

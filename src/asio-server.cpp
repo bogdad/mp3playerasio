@@ -56,7 +56,7 @@ public:
 
   static pointer create(asio::io_context &io_context) {
     LOG(INFO) << "creating file";
-    Mp3 file = Mp3::create(fs::path("./classical-triumphant-march-163852.mp3"));
+    Mp3 file = Mp3::create(fs::path("../classical-triumphant-march-163852.mp3"));
 
     return {new TcpConnection(io_context, std::move(file)),
             [](TcpConnection *conn) {

@@ -1,15 +1,20 @@
 #include "protocol.hpp"
+#include <SDL_audio.h>
 #include <absl/functional/any_invocable.h>
 #include <absl/strings/str_cat.h>
 #include <absl/utility/utility.h>
+#include <asio/detail/atomic_count.hpp>
 #include <asio/io_context.hpp>
+#include <atomic>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <iterator>
 #include <memory>
 
 #include <absl/log/log.h>
-#include <AudioToolbox/AudioToolbox.h>
+#include <SDL2/SDL.h>
 #include <mutex>
 #include <ostream>
 #include <span>
@@ -25,120 +30,66 @@
 
 namespace am {
 
-OSStatus CallbackRenderProc(void *inRefCon,
-              AudioUnitRenderActionFlags *ioActionFlags,
-              const AudioTimeStamp *inTimeStamp,
-              UInt32 inBusNumber,
-              UInt32 inNumberFrames,
-              AudioBufferList * ioData);
-
-struct AudioUnitCloser {
-  void operator()(void * unit) {
-    auto audio_unit = static_cast<AudioUnit>(unit);
-    AudioOutputUnitStop(audio_unit);
-    AudioUnitUninitialize(audio_unit);
-    AudioComponentInstanceDispose(audio_unit);
-  } 
-};
-struct AudioUnitHandle {
-  std::unique_ptr<void, AudioUnitCloser> handle;
-  AudioUnit operator*() {
-    return static_cast<AudioUnit>(handle.get());
-  }
-};
-
-static void CheckError(OSStatus error, const char *operation)
-{
-  if (error == noErr) return;
-  
-  char str[20];
-  // see if it appears to be a 4-char-code
-  *(UInt32 *)(str + 1) = CFSwapInt32HostToBig(error);
-  if (isprint(str[1]) && isprint(str[2]) && isprint(str[3]) && isprint(str[4])) {
-    str[0] = str[5] = '\'';
-    str[6] = '\0';
-  } else
-    // no, format it as an integer
-    snprintf(str, 20, "%d", (int)error);
-  
-  fprintf(stderr, "Error: %s (%s)\n", operation, str);
-  
-  exit(1);
-}
-
-
 static void log_mp3_format(mp3dec_frame_info_t &info) {
   LOG(INFO) << "mp3 format" << std::endl
-     << "sample rate       : " << info.hz << std::endl
-     << "channels          : " << info.channels << std::endl
-     << "bytes per frame   : " << info.frame_bytes << std::endl
-     << "bitrate           : " << info.bitrate_kbps << std::endl
-     << "frame_offset      : " << info.frame_offset << std::endl
-     << "frame_bytes       : " << info.frame_bytes << std::endl;
+    << "sample rate       : " << info.hz << std::endl
+    << "channels          : " << info.channels << std::endl
+    << "bytes per frame   : " << info.frame_bytes << std::endl
+    << "bitrate           : " << info.bitrate_kbps << std::endl
+    << "frame_offset      : " << info.frame_offset << std::endl
+   << "frame_bytes       : " << info.frame_bytes << std::endl;
 }
 
-static void log_format(const AudioStreamBasicDescription& format) {
-  LOG(INFO) << "default format "
-     << "sample rate       : " << format.mSampleRate << std::endl
-     << "format ID         : " << format.mFormatID << std::endl
-     << "format flags      : " << format.mFormatFlags << std::endl
-     << "bytes per packet  : " << format.mBytesPerPacket << std::endl
-     << "frames per packet : " << format.mFramesPerPacket << std::endl
-     << "bytes per frame   : " << format.mBytesPerFrame << std::endl
-     << "channels per frame: " << format.mChannelsPerFrame << std::endl
-     << "bits per channel  : " << format.mBitsPerChannel;
-}
+void my_audio_callback(void *userdata, std::uint8_t *stream, int len);
+
+struct SdlAudio {
+  SdlAudio() {
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+      LOG(ERROR) << "cant init sdl";
+      exit(-1);
+    }
+  }
+  ~SdlAudio() {
+    SDL_CloseAudio();
+  }
+  SdlAudio(const SdlAudio&) = delete;
+  SdlAudio(SdlAudio &&) = delete;
+  SdlAudio& operator=(const SdlAudio&) = delete;
+  SdlAudio& operator=(SdlAudio&&) = delete;
+};
 
 struct Player {
   using OnLowWatermark = std::function<void()>;
 
   static std::unique_ptr<Player> create(OnLowWatermark &&on_low_watermark) {
-    AudioComponentDescription outputcd = {0}; // 10.6 version
-    outputcd.componentType = kAudioUnitType_Output;
-    outputcd.componentSubType = kAudioUnitSubType_DefaultOutput;
-    outputcd.componentManufacturer = kAudioUnitManufacturer_Apple;
-  
-    AudioComponent comp = AudioComponentFindNext (nullptr, &outputcd);
-    if (comp == nullptr) {
-      LOG(ERROR) << "can't get output unit";
-      exit(-1);
-    }
-    AudioUnit output_unit{};
-    CheckError(AudioComponentInstanceNew(comp, &output_unit),
-          "Couldn't open component for outputUnit");
-    
-    auto void_unit_handle = std::unique_ptr<void, AudioUnitCloser>(output_unit);
-    auto audio_unit_handle = AudioUnitHandle{std::move(void_unit_handle)};
-    auto *player = new Player(std::move(audio_unit_handle), std::move(on_low_watermark)); 
+    auto *player = new Player(std::move(on_low_watermark)); 
     auto res = std::unique_ptr<Player>(player);
 
     res->setup_unit();
     return res;
   } 
-  void callback(AudioBufferList * ioData, const AudioTimeStamp *timestamp, UInt32 inNumberFrames) {
-    // LOG(INFO) << "requested number of buffers " << ioData->mNumberBuffers;
-
-    auto channel_size = ioData->mBuffers[0].mDataByteSize;
-    // LOG(INFO) << "decoded stream ready to play: " << _output_buffer.ready_size() << " asked for " << inNumberFrames << " committing " << channel_size;
-    if (_output_buffer.ready_size() >= channel_size) {
-      _output_buffer.memcpy_out(ioData->mBuffers[0].mData, channel_size);
-    } else {
+  void callback(std::uint8_t *stream, int len) {
+    auto audio_len = static_cast<int>(_output_buffer.ready_size());
+    LOG(INFO) << "callback " << (void *) stream << " len " << len << "ready_size " << audio_len;
+    
+    if (audio_len == 0) {
       stop();
+      return;
     }
+    len = (len > audio_len ? audio_len : len);
+    _output_buffer.memcpy_out(stream, len);
     
     if (_output_buffer.below_watermark()) {
       _on_low_watermark();
     }
-
-    //_starting_frame_count = j;
   }
 void start() {
   _started = true;
-  CheckError (AudioOutputUnitStart(*_output_unit), "Couldn't start output unit");
+  SDL_PauseAudio(0);
 }
 void stop() {
-  _started = true;
-  CheckError (AudioOutputUnitStop(*_output_unit), "Couldn't stop output unit");
+  _started = false;
+  SDL_PauseAudio(0);
 }
 RingBuffer &buffer() {
   return _output_buffer;
@@ -147,86 +98,35 @@ bool started() {
   return _started;
 }
 private:
-  Player(AudioUnitHandle output_unit, OnLowWatermark &&on_low_watermark): _output_unit(std::move(output_unit)), _output_buffer(16000000, 20000, 40000), _on_low_watermark(std::move(on_low_watermark)) {
-    format_.mSampleRate = 44100;
-    format_.mFormatID = kAudioFormatLinearPCM;
-    format_.mFormatFlags =  kLinearPCMFormatFlagIsSignedInteger /*| kLinearPCMFormatFlagIsPacked*/;
-    format_.mBitsPerChannel = 16;
-    format_.mChannelsPerFrame = 2;
-    format_.mFramesPerPacket = 1;
-    format_.mBytesPerFrame = (format_.mBitsPerChannel * format_.mChannelsPerFrame) / 8;
-    format_.mBytesPerPacket = format_.mBytesPerFrame * format_.mFramesPerPacket;
-    format_.mReserved = 0;
+  Player(OnLowWatermark &&on_low_watermark): 
+    _output_buffer(16000000, 20000, 40000), _on_low_watermark(std::move(on_low_watermark)) {
+
+    SDL_zero(_spec);
+    _spec.freq = 44100;
+    _spec.format = AUDIO_U8;
+    _spec.channels = 2;
+    _spec.samples = _output_buffer.ready_write_size();
+    _spec.callback = my_audio_callback;
+    _spec.userdata = this;
   }
   void setup_unit() {
-
-    AURenderCallbackStruct input;
-    input.inputProc = CallbackRenderProc;
-    input.inputProcRefCon = this;
-    CheckError(AudioUnitSetProperty(*_output_unit,
-        kAudioUnitProperty_SetRenderCallback, 
-        kAudioUnitScope_Global,
-        0,
-        &input,
-        sizeof(input)),
-      "AudioUnitSetProperty failed: kAudioUnitProperty_SetRenderCallback");
-
-    unsigned int cur_format_size = sizeof(AudioStreamBasicDescription);
-    AudioStreamBasicDescription cur_format = {0};
-    CheckError(AudioUnitGetProperty(*_output_unit,
-                         kAudioUnitProperty_StreamFormat,
-                         kAudioUnitScope_Global,
-                         0,
-                         (void *)&cur_format,
-                         &cur_format_size), "AudioUnitGetProperty failed: kAudioUnitProperty_StreamFormat");
-    log_format(cur_format);
-
-    CheckError(AudioUnitSetProperty(*_output_unit,
-        kAudioUnitProperty_StreamFormat,
-        kAudioUnitScope_Input,
-        0,
-        &format_,
-        sizeof(format_)),
-      "AudioUnitSetProperty failed: kAudioUnitProperty_StreamFormat");
-
-    cur_format_size = sizeof(AudioStreamBasicDescription);
-    cur_format = {};
-    CheckError(AudioUnitGetProperty(*_output_unit,
-                         kAudioUnitProperty_StreamFormat,
-                         kAudioUnitScope_Global,
-                         0,
-                         (void *)&cur_format,
-                         &cur_format_size), "AudioUnitGetProperty failed: kAudioUnitProperty_StreamFormat");
-    log_format(cur_format);
-
-    // initialize unit
-    CheckError (AudioUnitInitialize(*_output_unit),
-        "Couldn't initialize output unit");
+    if (SDL_OpenAudio(&_spec, nullptr) < 0) {
+      LOG(ERROR) << "Couldn't open audio: " << SDL_GetError();
+      exit(-1);
+    }
   }
-  AudioUnitHandle _output_unit;
+  SdlAudio _audio{};
+  SDL_AudioSpec _spec;
   double _starting_frame_count {};
   RingBuffer _output_buffer;
   std::atomic_bool _started{false};
   OnLowWatermark _on_low_watermark;
-  AudioStreamBasicDescription format_;
 };
 
-
-OSStatus CallbackRenderProc(void *inRefCon,
-              AudioUnitRenderActionFlags *ioActionFlags,
-              const AudioTimeStamp *inTimeStamp,
-              UInt32 inBusNumber,
-              UInt32 inNumberFrames,
-              AudioBufferList * ioData) {
-  
-  // LOG(DEBUG) << "CallbackRenderProc flags " << *ioActionFlags << " needs " << inNumberFrames << " frames at " << CFAbsoluteTimeGetCurrent();
-  auto *player = static_cast<Player *>(inRefCon);
-  player->callback(ioData, inTimeStamp, inNumberFrames);
-  
-  return noErr;
+void my_audio_callback(void *userdata, std::uint8_t *stream, int len) {
+  auto *player = static_cast<Player *>(userdata);
+  player->callback(stream, len);
 }
-
-
 
 struct Mp3Stream::Pimpl {
 

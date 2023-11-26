@@ -1,5 +1,5 @@
 ---
-Checks:          'misc-include-cleaner, clang-diagnostic-*,clang-analyzer-*,cppcoreguidelines-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-nodiscard'
+Checks:          'misc-include-cleaner, clang-diagnostic-*,clang-analyzer-*,cppcoreguidelines-*,modernize-*,-cppcoreguidelines-avoid-magic-numbers,-readability-magic-numbers,-modernize-use-trailing-return-type,-modernize-use-nodiscard'
 WarningsAsErrors: true
 HeaderFilterRegex: ''
 AnalyzeTemporaryDtors: false
@@ -9,6 +9,8 @@ CheckOptions:
     value:           'L;LL;LU;LLU'
   - key:             cert-oop54-cpp.WarnOnlyIfThisHasSuspiciousField
     value:           '0'
+  - key:             cppcoreguidelines-avoid-magic-numbers.IgnoreUserDefinedLiterals
+    value:           '1'
   - key:             cppcoreguidelines-explicit-virtual-functions.IgnoreDestructors
     value:           '1'
   - key:             cppcoreguidelines-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic

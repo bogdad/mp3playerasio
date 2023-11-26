@@ -1,6 +1,5 @@
 #pragma once
 
-#include <absl/base/macros.h>
 #include <absl/functional/any_invocable.h>
 #include <absl/strings/str_format.h>
 #include <array>
@@ -223,7 +222,8 @@ struct RingBuffer {
   const_buffers_type data(std::size_t max_size) const;
 
   bool empty() const;
-  size_t ready_size() const;
+  std::size_t ready_size() const;
+  std::size_t ready_write_size() const;
   bool below_watermark() const;
   bool below_high_watermark() const;
 

@@ -126,6 +126,8 @@ bool RingBuffer::empty() const { return _filled_size == 0; }
 
 std::size_t RingBuffer::ready_size() const { return _filled_size; }
 
+std::size_t RingBuffer::ready_write_size() const { return _non_filled_size; }
+
 bool RingBuffer::below_watermark() const { return ready_size() < _low_watermark;}
 
 bool RingBuffer::below_high_watermark() const { return ready_size() < _high_watermark;}
