@@ -40,18 +40,23 @@ target_include_directories(audio-player PUBLIC include)
 target_link_libraries(audio-player
 	PRIVATE asio::asio absl::log minimp3::minimp3 SDL2::SDL2)
 
+add_library(asio-client 
+	src/asio-client.cpp src/client-protocol.cpp)
+target_include_directories(asio-client
+	PUBLIC include)
+target_link_libraries(asio-client 
+	PRIVATE protocol audio-player asio::asio absl::strings)
+
 add_executable(asio-server 
 	src/asio-server.cpp src/server-protocol.cpp)
 target_include_directories(asio-server PUBLIC include)
 target_link_libraries(asio-server
 	PRIVATE asio::asio absl::strings absl::log mp3 protocol)
 
-add_executable(asio-client 
-	src/asio-client.cpp src/client-protocol.cpp)
-target_include_directories(asio-client
-	PUBLIC include)
-target_link_libraries(asio-client 
-	PRIVATE protocol audio-player asio::asio absl::strings)
+add_executable(driver src/driver.cpp)
+target_include_directories(driver PUBLIC include)
+target_link_libraries(driver 
+	PRIVATE asio::asio absl::any_invocable absl::log)
 
 
 add_subdirectory(test)

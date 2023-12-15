@@ -12,9 +12,10 @@ namespace am {
 struct Mp3Stream {
 public:
   using OnLowWatermark = std::function<void()>;
-  Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand, OnLowWatermark &&on_low_watermark);
+  Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand);
   void set_on_low_watermark(OnLowWatermark &&);
   void decode_next();
+  RingBuffer &buffer();
 private:
   struct Pimpl;
   struct PimplDeleter {

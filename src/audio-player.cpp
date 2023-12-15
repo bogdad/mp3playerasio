@@ -17,10 +17,12 @@
 #include <mutex>
 #include <ostream>
 #include <span>
+#include <stdexcept>
 #include <utility>
 
 #define MINIMP3_IMPLEMENTATION
 #define MINIMP3_ONLY_MP3
+#define MINIMP3_FLOAT_OUTPUT
 #include <minimp3.h>
 
 #include "audio-player.hpp"
@@ -41,6 +43,16 @@ static void log_mp3_format(mp3dec_frame_info_t &info) {
 
 void my_audio_callback(void *userdata, std::uint8_t *stream, int len);
 
+void log_spec(const SDL_AudioSpec &spec) {
+  LOG(INFO)
+    << " samples " << spec.samples
+    << " freq " << spec.freq
+    << " channels " << (int) spec.channels
+    << " format " << spec.format
+    << " userdata " << spec.userdata
+    << " callback " << spec.callback;
+}
+
 struct SdlAudio {
   SdlAudio() {
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
@@ -49,7 +61,7 @@ struct SdlAudio {
     }
   }
   ~SdlAudio() {
-    SDL_CloseAudio();
+    SDL_Quit();
   }
   SdlAudio(const SdlAudio&) = delete;
   SdlAudio(SdlAudio &&) = delete;
@@ -57,11 +69,42 @@ struct SdlAudio {
   SdlAudio& operator=(SdlAudio&&) = delete;
 };
 
+struct SdlAudioDevice {
+  SdlAudioDevice(SDL_AudioSpec &&specs): specs_(std::move(specs)) {
+    SDL_AudioSpec have_spec;
+    audio_dev_id_ = SDL_OpenAudioDevice(NULL, 0, &specs_,
+        &have_spec, SDL_AUDIO_ALLOW_ANY_CHANGE);
+
+    if(audio_dev_id_ == 0 ) {
+      throw std::runtime_error("sdl2: could not open audio");
+    }
+    LOG(INFO) << "audo device " << audio_dev_id_ << " want spec "; log_spec(specs_); 
+    LOG(INFO) << "have spec "; log_spec(have_spec);
+  }
+  ~SdlAudioDevice() {
+    SDL_CloseAudioDevice(audio_dev_id_);
+  }
+  SdlAudioDevice(const SdlAudioDevice &) = delete;
+  SdlAudioDevice(SdlAudioDevice &&) = delete;
+  SdlAudioDevice& operator=(const SdlAudioDevice &) = delete;
+  SdlAudioDevice& operator=(SdlAudioDevice &&other) = delete;
+
+  void play() {
+    SDL_PauseAudioDevice(audio_dev_id_, 0);
+  }
+  void stop() {
+    SDL_PauseAudioDevice(audio_dev_id_, 1);
+  }
+
+  SDL_AudioSpec specs_;
+  unsigned int audio_dev_id_{};
+};
+
 struct Player {
   using OnLowWatermark = std::function<void()>;
 
   static std::unique_ptr<Player> create(OnLowWatermark &&on_low_watermark) {
-    auto *player = new Player(std::move(on_low_watermark)); 
+    auto *player = new Player(std::move(on_low_watermark));     
     auto res = std::unique_ptr<Player>(player);
 
     res->setup_unit();
@@ -70,13 +113,13 @@ struct Player {
 
   void callback(std::uint8_t *stream, int len) {
     auto audio_len = static_cast<int>(_output_buffer.ready_size());
-    LOG(INFO) << "callback " << (void *) stream << " len " << len << "ready_size " << audio_len;
+    // LOG(INFO) << "callback " << (void *) stream << " len " << len << "ready_size " << audio_len;
     
     if (audio_len == 0) {
       stop();
       return;
     }
-
+    std::memset(stream, 0, len);
     len = (len > audio_len ? audio_len : len);
     _output_buffer.memcpy_out(stream, len);
     
@@ -85,12 +128,14 @@ struct Player {
     }
   }
 void start() {
+  LOG(INFO) << "audo device started";
   _started = true;
-  SDL_PauseAudio(0);
+  if (audio_device_.has_value()) audio_device_->play();
 }
 void stop() {
+  LOG(INFO) << "audio device stopped";
   _started = false;
-  SDL_PauseAudio(0);
+  if (audio_device_.has_value()) audio_device_->stop();
 }
 RingBuffer &buffer() {
   return _output_buffer;
@@ -100,25 +145,23 @@ bool started() {
 }
 private:
   Player(OnLowWatermark &&on_low_watermark): 
-    _output_buffer(16000000, 20000, 40000), _on_low_watermark(std::move(on_low_watermark)) {
-
-    SDL_zero(_spec);
-    _spec.freq = 44100;
-    _spec.format = AUDIO_U8;
-    _spec.channels = 2;
-    _spec.samples = _output_buffer.ready_write_size();
-    _spec.callback = my_audio_callback;
-    _spec.userdata = this;
+    _output_buffer(16000000, 40000, 80000), _on_low_watermark(std::move(on_low_watermark)) { 
   }
 
   void setup_unit() {
-    if (SDL_OpenAudio(&_spec, nullptr) < 0) {
-      LOG(ERROR) << "Couldn't open audio: " << SDL_GetError();
-      exit(-1);
-    }
+    SDL_AudioSpec spec;
+    SDL_zero(spec);
+    spec.freq = 44100;
+    spec.format = AUDIO_F32;
+    spec.channels = 2;
+    spec.samples = 1024;
+    spec.callback = my_audio_callback;
+    spec.userdata = this;
+    audio_device_.emplace(std::move(spec));
   }
+
   SdlAudio _audio{};
-  SDL_AudioSpec _spec;
+  std::optional<SdlAudioDevice> audio_device_{};
   double _starting_frame_count {};
   RingBuffer _output_buffer;
   std::atomic_bool _started{false};
@@ -138,16 +181,12 @@ struct Mp3Stream::Pimpl {
       asio::post(_io_context, [this](){
         decode_next();
       });
-    })), _on_low_watermark(std::move(on_low_watermark))/*, _wav_file("./wav.wav", std::ios_base::out | std::ios_base::binary)*/ {
+    })) {
      mp3dec_init(&_mp3d); }
 
   void decode_next() {
     while ((_input.ready_size() > 0) && (_player->buffer().below_high_watermark()) ) {
       decode_next_inner();
-    }
-    // _wav_file.flush();
-    if (_input.ready_size() == 0) {
-      LOG(INFO) << "decode_next: empty input";
     }
     _decoded_frames = 0;
   }
@@ -169,7 +208,7 @@ struct Mp3Stream::Pimpl {
       _input.commit(info.frame_bytes);
       if (samples) {
         _decoded_frames++;
-        size_t decoded_size = samples * sizeof(mp3d_sample_t);
+        size_t decoded_size = 2*samples * sizeof(mp3d_sample_t);
         // auto span = std::span{pcm.data(), decoded_size};
         // _wav_file << span.data();
         _player->buffer().memcpy_in(pcm.data(), decoded_size);
@@ -204,7 +243,6 @@ struct Mp3Stream::Pimpl {
   int _decoded_frames {};
   std::once_flag _log_mp3_format_once;
   OnLowWatermark _on_low_watermark;
-  //std::ofstream _wav_file;
 };
 
 void Mp3Stream::decode_next() {
@@ -215,9 +253,7 @@ void Mp3Stream::PimplDeleter::operator()(Pimpl *pimpl) {
   delete pimpl;
 }
 
-Mp3Stream::Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand, OnLowWatermark &&on_low_watermark):_pimpl(new Pimpl(input, io_context, strand, std::move(on_low_watermark))) {}
-void Mp3Stream::set_on_low_watermark(OnLowWatermark &&fun) {
-  _pimpl->set_on_low_watermark(std::move(fun));
-}
+Mp3Stream::Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand)
+:_pimpl(new Pimpl(input, io_context, strand)){};
 
 } // namespace am

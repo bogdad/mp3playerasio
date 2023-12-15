@@ -11,8 +11,10 @@
 #include <asio/registered_buffer.hpp>
 #include <asio/strand.hpp>
 #include <memory>
+#include <string_view>
 #include <utility>
 
+#include "asio-client.hpp"
 #include "audio-player.hpp"
 #include "client-protocol.hpp"
 #include "protocol.hpp"
@@ -21,55 +23,61 @@ using asio::ip::tcp;
 
 namespace am {
 
-struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
+void AsioClient::connect(std::string_view host) {
 
-  using Pointer = std::shared_ptr<TcpClientConnection>;
+  resolver_.async_resolve(
+    host, "8060", [this](const asio::error_code &, auto results) mutable {
+      auto connection = TcpClientConnection::create(io_context_, strand_, mp3_stream_);
+      asio::async_connect(
+          connection->socket(), results,
+          [connection = std::move(connection)](auto ec, auto endpoint) {
+            connection->on_connect(endpoint);
+          });
+    });
+}
 
-  static TcpClientConnection::Pointer create(asio::io_context &io_context, asio::io_context::strand &strand) {
+TcpClientConnection::Pointer TcpClientConnection::create(asio::io_context &io_context, asio::io_context::strand &strand, 
+  Mp3Stream &mp3_stream) {
     auto res = std::shared_ptr<TcpClientConnection>(
-        new TcpClientConnection(io_context, strand, 
-            [](){}));
-    res->_mp3_stream.set_on_low_watermark([res](){
-      res->handle();
-    });
+        new TcpClientConnection(io_context, strand, mp3_stream));
     return res;
-  }
+}
 
-  void on_connect(asio::ip::tcp::endpoint endpoint) {
-    auto ptr = shared_from_this();
-    receive([ptr = std::move(ptr), this](auto ec) {
-      if (ec == asio::error::eof) {
-        LOG(INFO) << "client: server closed socket";
-      }
-    });
-  }
 
-  tcp::socket &socket() { return _socket; }
+void TcpClientConnection::on_connect(asio::ip::tcp::endpoint endpoint) {
+  auto ptr = shared_from_this();
+  receive([ptr = std::move(ptr), this](auto ec) {
+    if (ec == asio::error::eof) {
+      LOG(INFO) << "client: server closed socket";
+    }
+  });
+}
 
-private:
-  TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand,
-    Mp3Stream::OnLowWatermark &&on_low_watermark)
-      : _socket(io_context), _read_buffer(8388608, 40000, 80000),
+tcp::socket &TcpClientConnection::socket() { return _socket; }
+
+TcpClientConnection::TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream &mp3_stream)
+      : _socket(io_context),
+        mp3_stream_(mp3_stream),
         _client_decoder(
             [this](buffers_2<std::string_view> ts) {
               for (auto sv : ts) {
                 LOG(INFO) << "time " << sv;
               }
             },
-            [this](RingBuffer &buff) {
-              _mp3_stream.decode_next();
-            }), _mp3_stream(_read_buffer, io_context, strand, std::move(on_low_watermark)) {}
+            [this](RingBuffer &buff) mutable {
+              mp3_stream_.decode_next();
+            }) {}
 
-  void
-  receive(absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {
+void
+  TcpClientConnection::receive(absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {
     auto ptr = shared_from_this();
     _socket.async_read_some(
-        _read_buffer.prepared(),
+        mp3_stream_.buffer().prepared(),
         [this, ptr = std::move(ptr), on_error = std::move(on_error)](
             const asio::error_code &ec,
             const size_t bytes_transferred) mutable {
           if (ec) {
-            LOG(INFO) << "client: received " << _read_buffer << " error " << ec 
+            LOG(INFO) << "client: received " << mp3_stream_.buffer() << " error " << ec 
               << " bytes available " << _socket.available();
             on_error(ec);
             // we did not parse the whole read_buffer yet, we schedule a callback to be called once
@@ -82,68 +90,19 @@ private:
             // });
             // set on low watermark retains tcp connection strongly forever.
           } else {
-            ptr->_read_buffer.consume(bytes_transferred);
-            LOG(INFO) << "client: received from network " << _read_buffer;
+            ptr->mp3_stream_.buffer().consume(bytes_transferred);
+            LOG(INFO) << "client: received from network " << mp3_stream_.buffer();
             handle();
             receive(std::move(on_error));
           }
         });
   }
 
-  void handle() {
-    _client_decoder.try_read_client(_read_buffer);
-    LOG(INFO) << "client: handled " << _read_buffer;
+void TcpClientConnection::handle() {
+    _client_decoder.try_read_client(mp3_stream_.buffer());
+    LOG(INFO) << "client: handled " << mp3_stream_.buffer();
   }
-
-  tcp::socket _socket;
-  RingBuffer _read_buffer;
-  ClientEncoder _client_encoder{};
-  ClientDecoder _client_decoder;
-  Mp3Stream _mp3_stream;
-  DestructionSignaller _destruction_signaller{"TcpClientConnection"};
-};
 
 } // namespace am
 
-int main(int argc, char *argv[]) {
 
-  using namespace am;
-
-  std::srand(std::time(nullptr));
-
-  if (argc != 2) {
-    LOG(INFO) << "Usage: client <host>" << std::endl;
-    return 1;
-  }
-
-  std::atomic_int should_stop = 0;
-
-  asio::io_context io_context;
-  asio::io_context::strand strand{io_context};
-  asio::executor_work_guard<asio::io_context::executor_type> wg = asio::make_work_guard(io_context);
-  //asio::signal_set signals(io_context, SIGINT);
-  //signals.async_wait( [&should_stop](const asio::error_code ec, int signal){
-  // should_stop = 1;
-  //});
-  
-  tcp::resolver resolver(io_context);
-
-  resolver.async_resolve(
-    argv[1], "8060", [&io_context, &strand](const asio::error_code &, auto results) {
-      auto connection = TcpClientConnection::create(io_context, strand);
-      asio::async_connect(
-          connection->socket(), results,
-          [connection = std::move(connection)](auto ec, auto endpoint) {
-            connection->on_connect(endpoint);
-          });
-    });
-
-  while (!should_stop) {
-    io_context.run_one(); 
-  }
-  LOG(INFO) << "shutting down";
-  fflush(stdout); fflush(stderr);
-
-  // here we need to unschedule all on commit callbacks, they are preventing ring buffer to die.
-  return 0;
-}
