@@ -10,11 +10,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
-#include <iterator>
 #include <memory>
 
 #include <absl/log/log.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <mutex>
 #include <ostream>
 #include <span>
@@ -68,6 +67,7 @@ struct Player {
     res->setup_unit();
     return res;
   } 
+
   void callback(std::uint8_t *stream, int len) {
     auto audio_len = static_cast<int>(_output_buffer.ready_size());
     LOG(INFO) << "callback " << (void *) stream << " len " << len << "ready_size " << audio_len;
@@ -76,6 +76,7 @@ struct Player {
       stop();
       return;
     }
+
     len = (len > audio_len ? audio_len : len);
     _output_buffer.memcpy_out(stream, len);
     
@@ -109,6 +110,7 @@ private:
     _spec.callback = my_audio_callback;
     _spec.userdata = this;
   }
+
   void setup_unit() {
     if (SDL_OpenAudio(&_spec, nullptr) < 0) {
       LOG(ERROR) << "Couldn't open audio: " << SDL_GetError();

@@ -250,8 +250,7 @@ private:
   std::size_t _filled_size;
   std::size_t _non_filled_start;
   std::size_t _non_filled_size;
-  DestructionSignaller _destruction_signaller {"RingBuffer"};
-  mutable std::mutex _mutex{};
+  DestructionSignaller _destruction_signaller { "RingBuffer" };
   std::size_t _low_watermark;
   std::size_t _high_watermark;
 };

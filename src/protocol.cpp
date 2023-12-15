@@ -24,8 +24,8 @@ void RingBuffer::reset() {
   _non_filled_size = _size;
 }
 
-void RingBuffer::commit(std::size_t len) {
-  std::scoped_lock l(_mutex);
+void RingBuffer::commit(std::size_t len)
+{
   _non_filled_size += len;
   _filled_size -= len;
   _filled_start += len;
