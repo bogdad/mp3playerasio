@@ -19,6 +19,7 @@
 #include <span>
 #include <stdexcept>
 #include <utility>
+#include <optional>
 
 #define MINIMP3_IMPLEMENTATION
 #define MINIMP3_ONLY_MP3

@@ -6,6 +6,9 @@
 #include <asio/executor.hpp>
 #include <asio/executor_work_guard.hpp>
 #include <asio/io_context.hpp>
+
+#include <optional>
+
 namespace am {
 
 struct Song {
