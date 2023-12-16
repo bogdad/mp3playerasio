@@ -12,7 +12,10 @@ namespace am {
 
 Driver::Driver(asio::io_context &io_context, asio::io_context::strand &strand): buffer_(16000000, 40000, 80000), context_(io_context),
 work_guard_(io_context.get_executor()), mp3_stream_(buffer_, io_context, strand) {
+}
 
+void Driver::play(Song &&) {
+  
 }
 
 } // namespace am
@@ -38,7 +41,7 @@ int main(int argc, char *argv[]) {
     should_stop = 1;
   });
   
-  auto driver = am::Driver(io_context);
+  auto driver = am::Driver(io_context, strand);
   driver.play({});
 
   while (!should_stop) {

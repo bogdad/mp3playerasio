@@ -175,7 +175,7 @@ void my_audio_callback(void *userdata, std::uint8_t *stream, int len) {
 
 struct Mp3Stream::Pimpl {
 
-  Pimpl(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand, OnLowWatermark &&on_low_watermark): 
+  Pimpl(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand): 
   _input(input), _io_context(io_context), _strand(strand), _player(Player::create(
     [this](){
       asio::post(_io_context, [this](){

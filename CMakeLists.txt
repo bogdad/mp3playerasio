@@ -56,7 +56,7 @@ target_link_libraries(asio-server
 add_executable(driver src/driver.cpp)
 target_include_directories(driver PUBLIC include)
 target_link_libraries(driver 
-	PRIVATE asio::asio absl::any_invocable absl::log)
+	PRIVATE asio::asio absl::any_invocable absl::log protocol audio-player)
 
 
 add_subdirectory(test)

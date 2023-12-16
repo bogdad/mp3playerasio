@@ -13,7 +13,7 @@ struct Song {
 
 class Driver {
 public:
-	Driver(asio::io_context &context);
+	Driver(asio::io_context &context, asio::io_context::strand &strand);
 	void play(Song &&song);
 
 private:
