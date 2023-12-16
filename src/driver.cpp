@@ -10,12 +10,14 @@ using asio::ip::tcp;
 
 namespace am {
 
-Driver::Driver(asio::io_context &io_context, asio::io_context::strand &strand): buffer_(16000000, 40000, 80000), context_(io_context),
-work_guard_(io_context.get_executor()), mp3_stream_(buffer_, io_context, strand) {
+Driver::Driver(asio::io_context &io_context, asio::io_context::strand &strand, std::string &&host): buffer_(16000000, 40000, 80000), 
+context_(io_context), strand_(strand),
+work_guard_(io_context.get_executor()), host_(std::move(host)), mp3_stream_(buffer_, io_context, strand) {
 }
 
-void Driver::play(Song &&) {
-  
+void Driver::play(Song && song) {
+  asio_client_.emplace(context_, strand_, mp3_stream_);
+  asio_client_->connect(host_);
 }
 
 } // namespace am
@@ -41,7 +43,7 @@ int main(int argc, char *argv[]) {
     should_stop = 1;
   });
   
-  auto driver = am::Driver(io_context, strand);
+  auto driver = am::Driver(io_context, strand, "localhost");
   driver.play({});
 
   while (!should_stop) {

@@ -23,19 +23,6 @@ using asio::ip::tcp;
 
 namespace am {
 
-void AsioClient::connect(std::string_view host) {
-
-  resolver_.async_resolve(
-    host, "8060", [this](const asio::error_code &, auto results) mutable {
-      auto connection = TcpClientConnection::create(io_context_, strand_, mp3_stream_);
-      asio::async_connect(
-          connection->socket(), results,
-          [connection = std::move(connection)](auto ec, auto endpoint) {
-            connection->on_connect(endpoint);
-          });
-    });
-}
-
 TcpClientConnection::Pointer TcpClientConnection::create(asio::io_context &io_context, asio::io_context::strand &strand, 
   Mp3Stream &mp3_stream) {
     auto res = std::shared_ptr<TcpClientConnection>(
@@ -102,6 +89,25 @@ void TcpClientConnection::handle() {
     _client_decoder.try_read_client(mp3_stream_.buffer());
     LOG(INFO) << "client: handled " << mp3_stream_.buffer();
   }
+
+
+void AsioClient::connect(std::string_view host) {
+  resolver_.async_resolve(
+    host, "8060", [this](const asio::error_code &, auto results) mutable {
+      auto connection = TcpClientConnection::create(io_context_, strand_, mp3_stream_);
+      asio::async_connect(
+          connection->socket(), results,
+          [connection = std::move(connection)](auto ec, auto endpoint) {
+            connection->on_connect(endpoint);
+          });
+    });
+}
+
+
+AsioClient::AsioClient(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream &mp3_stream):
+io_context_(io_context), strand_(strand), mp3_stream_(mp3_stream), resolver_(io_context_) {
+
+}
 
 } // namespace am
 

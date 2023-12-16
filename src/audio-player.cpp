@@ -226,6 +226,10 @@ struct Mp3Stream::Pimpl {
     }
   }
 
+  RingBuffer &buffer() {
+    return _input;
+  }
+
   void log_state() {
     LOG(INFO) << "input ready " << _input.ready_size() << " output ready " << _player->buffer().ready_size();
   }
@@ -249,11 +253,14 @@ void Mp3Stream::decode_next() {
   _pimpl->decode_next();
 }
 
-void Mp3Stream::PimplDeleter::operator()(Pimpl *pimpl) {
-  delete pimpl;
-}
-
 Mp3Stream::Mp3Stream(RingBuffer &input, asio::io_context &io_context, asio::io_context::strand &strand)
 :_pimpl(new Pimpl(input, io_context, strand)){};
 
+RingBuffer &Mp3Stream::buffer() {
+  return _pimpl->buffer();
+}
+
+void Mp3Stream::PimplDeleter::operator()(Pimpl *pimpl) {
+  delete pimpl;
+}
 } // namespace am
