@@ -1,11 +1,12 @@
 #include "protocol.hpp"
+#include "protocol-system.hpp"
+
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 #include <catch2/matchers/catch_matchers_predicate.hpp>
 #include <catch2/matchers/catch_matchers_quantifiers.hpp>
 #include <cstddef>
-#include <unistd.h>
 
 namespace am {
 
@@ -13,7 +14,7 @@ TEST_CASE("LinnearArray works", "[LinnearArray]") {
   using namespace Catch::Matchers;
   LinnearArray arr(100);
 
-  REQUIRE(arr.size() == ::sysconf(_SC_PAGESIZE));
+  REQUIRE(arr.size() == system_page_size());
   REQUIRE(arr.at(0) == 'x');
   REQUIRE(arr.at(1) == 0);
   arr.at(0) = 0;
@@ -25,7 +26,7 @@ TEST_CASE("LinnearArray works", "[LinnearArray]") {
 TEST_CASE("RingBuffer works", "[RingBuffer]") {
   using namespace Catch::Matchers;
 
-  size_t pagesize = ::sysconf(_SC_PAGESIZE);
+  size_t pagesize = system_page_size();
 
   RingBuffer buf(100, 20000, 40000);
   REQUIRE(buf.prepared().size() == pagesize);
