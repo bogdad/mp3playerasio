@@ -19,7 +19,7 @@ struct LinearMemInfo {
   void *_file_handle{};
   char *_p1{};
   char *_p2{};
-  
+
   std::size_t _len{};
 };
 

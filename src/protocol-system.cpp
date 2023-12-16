@@ -1,21 +1,21 @@
 #include "protocol-system.hpp"
 
+#include <cstddef>
 #include <exception>
 #include <sstream>
 #include <string>
 #include <type_traits>
-#include <cstddef>
 
 #if defined(__APPLE__) || defined(__linux__)
 #  include <fcntl.h>
 #  include <sys/mman.h>
 #  include <unistd.h>
 #elif defined(_WIN32) || defined(_WIN64)
-#  include <windows.h>
-#  include <sysinfoapi.h>
-#  include <processthreadsapi.h>
 #  include <conio.h>
+#  include <processthreadsapi.h>
+#  include <sysinfoapi.h>
 #  include <tchar.h>
+#  include <windows.h>
 #endif
 
 namespace am {
@@ -124,18 +124,19 @@ int LinearMemInfo::init(std::size_t minsize) {
   }
   VirtualFree(ptr, 0, MEM_RELEASE);
 
-  if (!(_file_handle = CreateFileMappingA(
-            INVALID_HANDLE_VALUE, 0, PAGE_READWRITE,
-            (unsigned long long)alloc_size >> 32, alloc_size & 0xffffffffu, 0))) {
+  if (!(_file_handle =
+            CreateFileMappingA(INVALID_HANDLE_VALUE, 0, PAGE_READWRITE,
+                               (unsigned long long)alloc_size >> 32,
+                               alloc_size & 0xffffffffu, 0))) {
     return -1;
   }
   if (!(_p1 = (char *)MapViewOfFileEx(_file_handle, FILE_MAP_ALL_ACCESS, 0, 0,
-                                    len, ptr))) {
+                                      len, ptr))) {
     return -1;
   }
 
-  if (!(_p2 = (char *)MapViewOfFileEx(_file_handle, FILE_MAP_ALL_ACCESS, 0, 0, len,
-                      (char *)ptr + len))) {
+  if (!(_p2 = (char *)MapViewOfFileEx(_file_handle, FILE_MAP_ALL_ACCESS, 0, 0,
+                                      len, (char *)ptr + len))) {
     // something went wrong - clean up
     // TODO: cleanup. its works as is because we are calling terminate on -1
     return -1;
@@ -147,13 +148,13 @@ int LinearMemInfo::init(std::size_t minsize) {
 }
 
 std::size_t system_page_size() {
-  #if defined(_WIN32) || defined(_WIN64)
+#if defined(_WIN32) || defined(_WIN64)
   SYSTEM_INFO sysInfo;
   GetSystemInfo(&sysInfo);
   return sysInfo.dwAllocationGranularity;
-  #else
+#else
   std::terminate();
-  #endif
+#endif
 }
 
 } // namespace am
