@@ -22,7 +22,7 @@ find_package(absl REQUIRED)
 find_package(minimp3 REQUIRED)
 find_package(sdl2 REQUIRED)
 
-add_library(protocol src/protocol.cpp)
+add_library(protocol src/protocol.cpp src/protocol-system.cpp)
 target_include_directories(protocol
 	PUBLIC include)
 target_link_libraries(protocol

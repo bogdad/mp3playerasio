@@ -1,5 +1,6 @@
 #pragma once
 
+#include "protocol-system.hpp"
 #include <absl/functional/any_invocable.h>
 #include <absl/strings/str_format.h>
 #include <array>
@@ -17,8 +18,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include <sys/mman.h>
 
 /*
 
@@ -90,10 +89,6 @@ private:
 
 struct LinnearArray {
   LinnearArray(std::size_t size);
-  ~LinnearArray();
-  LinnearArray(const LinnearArray &other) = delete;
-  LinnearArray &operator=(const LinnearArray &other) = delete;
-
   std::size_t size() const;
   inline char &at(std::size_t pos) { return *(_ptr + pos); }
   inline const char &at(std::size_t pos) const { return *(_ptr + pos); }
@@ -104,13 +99,9 @@ struct LinnearArray {
   std::vector<char> to_vector();
 
 private:
-  int init(std::size_t minsize);
-
   char *_ptr;
-  char *_p1;
-  char *_p2;
   std::size_t _len;
-  std::string _shname;
+  LinearMemInfo mapped_;
 };
 
 struct RingBuffer {
