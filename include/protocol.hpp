@@ -87,94 +87,22 @@ private:
 };
 
 struct LinnearArray {
-  LinnearArray(std::size_t size)
-      : _ptr(nullptr), _p1(nullptr), _p2(nullptr), _len(0), _shname("") {
-    int res = init(size);
-    if (res == -1) {
-      std::terminate();
-    }
-    _ptr = _p1;
-  }
-  ~LinnearArray() {
-    if (_p1)
-      munmap(_p1, _len);
-    if (_p2)
-      munmap(_p2, _len);
-    if (!_shname.empty())
-      shm_unlink(_shname.c_str());
-  }
+  LinnearArray(std::size_t size);
+  ~LinnearArray();
   LinnearArray(const LinnearArray &other) = delete;
   LinnearArray &operator=(const LinnearArray &other) = delete;
 
-  std::size_t size() { return _len; }
-
+  std::size_t size() const;
   inline char &at(std::size_t pos) { return *(_ptr + pos); }
-
   inline const char &at(std::size_t pos) const { return *(_ptr + pos); }
 
-  inline char *data() { return _ptr; }
+  inline char *data();
+  const char *data() const;
 
-  const char *data() const { return _ptr; }
-
-  std::vector<char> to_vector() {
-    auto res = std::vector<char>(size());
-    memcpy(res.data(), data(), size());
-    return res;
-  }
+  std::vector<char> to_vector();
 
 private:
-  int init(std::size_t minsize) {
-    pid_t pid = getpid();
-    static int counter = 0;
-    std::size_t pagesize = ::sysconf(_SC_PAGESIZE);
-    std::size_t bytes = minsize & ~(pagesize - 1);
-    if (minsize % pagesize) {
-      bytes += pagesize;
-    }
-    if (bytes * 2u < bytes) {
-      errno = EINVAL;
-      perror("overflow");
-      return -1;
-    }
-    int r = counter++;
-    std::stringstream s;
-    s << "pid_" << pid << "_buffer_" << r;
-    const auto shname = s.str();
-    shm_unlink(shname.c_str());
-    int fd = shm_open(shname.c_str(), O_RDWR | O_CREAT);
-    _shname = shname;
-    std::size_t len = bytes;
-    if (ftruncate(fd, len) == -1) {
-      perror("ftruncate");
-      return -1;
-    }
-    void *p =
-        ::mmap(nullptr, 2 * len, PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
-    if (p == MAP_FAILED) {
-      perror("mmap");
-      return -1;
-    }
-    munmap(p, 2 * len);
-
-    _p1 = (char *)mmap(p, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
-    if (_p1 == MAP_FAILED) {
-      perror("mmap1");
-      return -1;
-    }
-
-    _p2 = (char *)mmap((char *)p + len, len, PROT_WRITE, MAP_SHARED | MAP_FIXED,
-                       fd, 0);
-    if (_p2 == MAP_FAILED) {
-      perror("mmap2");
-      return -1;
-    }
-    _p1[0] = 'x';
-    printf("pointer %p %s: %p %p %p %ld %c %c\n", this, _shname.c_str(), p, _p1,
-           _p2, (char *)_p2 - (char *)_p1, _p1[0], _p2[0]);
-    _len = len;
-    _p1[0] = 0;
-    return 0;
-  }
+  int init(std::size_t minsize);
 
   char *_ptr;
   char *_p1;
@@ -278,9 +206,7 @@ struct Encoder {
 class infinite_timer {
 public:
   static constexpr auto interval = asio::chrono::seconds(3);
-  infinite_timer(asio::io_context &io_context) : timer_(io_context, interval) {
-    start();
-  }
+  infinite_timer(asio::io_context &io_context);
 
 private:
   void start();
