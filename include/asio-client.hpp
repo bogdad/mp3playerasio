@@ -19,14 +19,17 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
 
   using Pointer = std::shared_ptr<TcpClientConnection>;
 
-  static TcpClientConnection::Pointer create(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream &mp3_stream);
+  static TcpClientConnection::Pointer create(asio::io_context &io_context,
+                                             asio::io_context::strand &strand,
+                                             Mp3Stream &mp3_stream);
 
   void on_connect(asio::ip::tcp::endpoint endpoint);
 
   asio::ip::tcp::socket &socket();
 
 private:
-  TcpClientConnection(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream &mp3_stream);
+  TcpClientConnection(asio::io_context &io_context,
+                      asio::io_context::strand &strand, Mp3Stream &mp3_stream);
 
   void
   receive(absl::AnyInvocable<void(const asio::error_code &) const> &&on_error);
@@ -42,13 +45,15 @@ private:
 };
 
 struct AsioClient {
-	AsioClient(asio::io_context &io_context, asio::io_context::strand &strand, Mp3Stream &mp3_stream);
-	void connect(std::string_view host);
+  AsioClient(asio::io_context &io_context, asio::io_context::strand &strand,
+             Mp3Stream &mp3_stream);
+  void connect(std::string_view host);
+
 private:
-	asio::io_context &io_context_;
-	asio::io_context::strand &strand_; 
-	Mp3Stream &mp3_stream_;
-	asio::ip::tcp::resolver resolver_;
+  asio::io_context &io_context_;
+  asio::io_context::strand &strand_;
+  Mp3Stream &mp3_stream_;
+  asio::ip::tcp::resolver resolver_;
 };
 
 } // namespace am

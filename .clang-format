@@ -3,10 +3,10 @@ AlignEscapedNewlines: Left
 AlignTrailingComments:
     Kind: Always
     OverEmptyLines: 0
-BasedOnStyle: WebKit
+BasedOnStyle: LLVM
 BraceWrapping:
     AfterFunction: true
-BreakBeforeBraces: Custom
+BreakBeforeBraces: Attach
 BreakBeforeInheritanceComma: true
 BreakConstructorInitializers: BeforeComma
 IndentPPDirectives: AfterHash
@@ -15,11 +15,11 @@ IndentWidth: 2
 InsertNewlineAtEOF: true
 LineEnding: LF
 NamespaceIndentation: None
-QualifierAlignment: Right
+QualifierAlignment: Left
 RemoveSemicolon: true
 RequiresClausePosition: WithFollowing
 RequiresExpressionIndentation: OuterScope
-SpaceAfterTemplateKeyword: false
+SpaceAfterTemplateKeyword: true
 
 
 ---

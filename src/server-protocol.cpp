@@ -5,8 +5,7 @@
 
 namespace am {
 
-void ServerDecoder::try_read_server(RingBuffer& state)
-{
+void ServerDecoder::try_read_server(RingBuffer &state) {
   if (try_read(state)) {
     if (_envelope.message_type == 3) {
       // get time
@@ -21,15 +20,13 @@ void ServerDecoder::try_read_server(RingBuffer& state)
   }
 }
 
-void ServerEncoder::fill_time(std::string_view time, RingBuffer& buff)
-{
-  fill_envelope(Envelope { 1, static_cast<int>(time.size()) }, buff);
-  buff.memcpy_in(static_cast<char const*>(time.data()), time.size());
+void ServerEncoder::fill_time(std::string_view time, RingBuffer &buff) {
+  fill_envelope(Envelope{1, static_cast<int>(time.size())}, buff);
+  buff.memcpy_in(static_cast<const char *>(time.data()), time.size());
 }
 
-void ServerEncoder::fill_mp3(Mp3& file, RingBuffer& buff)
-{
-  fill_envelope(Envelope { 2, static_cast<int>(file.size()) }, buff);
+void ServerEncoder::fill_mp3(Mp3 &file, RingBuffer &buff) {
+  fill_envelope(Envelope{2, static_cast<int>(file.size())}, buff);
   // send file will send the rest
 }
 

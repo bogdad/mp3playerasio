@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <memory>
 
-
 namespace am {
 
 namespace fs = std::filesystem;
@@ -36,7 +35,9 @@ struct Mp3 {
 
 private:
   Mp3(fhandle fd, size_t size)
-      : _fd(std::move(fd)), _size(size), _current({0, size}){};
+      : _fd(std::move(fd))
+      , _size(size)
+      , _current({0, size}){};
   int call_sendfile(const asio::ip::tcp::socket &socket, off_t &len);
 
   fhandle _fd;

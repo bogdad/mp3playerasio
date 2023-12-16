@@ -10,27 +10,23 @@ using asio::ip::tcp;
 
 namespace am {
 
-Driver::Driver(asio::io_context& io_context, asio::io_context::strand& strand, std::string&& host)
+Driver::Driver(asio::io_context &io_context, asio::io_context::strand &strand,
+               std::string &&host)
     : buffer_(16000000, 40000, 80000)
     , context_(io_context)
     , strand_(strand)
     , work_guard_(io_context.get_executor())
     , host_(std::move(host))
-    , mp3_stream_(buffer_, io_context, strand)
-{
-}
+    , mp3_stream_(buffer_, io_context, strand) {}
 
-void Driver::play(Song&& song)
-{
+void Driver::play(Song &&song) {
   asio_client_.emplace(context_, strand_, mp3_stream_);
   asio_client_->connect(host_);
 }
 
 } // namespace am
 
-int main(int argc, char* argv[])
-{
-
+int main(int argc, char *argv[]) {
   using namespace am;
 
   std::srand(std::time(nullptr));
@@ -43,10 +39,11 @@ int main(int argc, char* argv[])
   std::atomic_int should_stop = 0;
 
   asio::io_context io_context;
-  asio::io_context::strand strand { io_context };
-  asio::executor_work_guard<asio::io_context::executor_type> wg = asio::make_work_guard(io_context);
+  asio::io_context::strand strand{io_context};
+  asio::executor_work_guard<asio::io_context::executor_type> wg =
+      asio::make_work_guard(io_context);
   asio::signal_set signals(io_context, SIGINT);
-  signals.async_wait([&should_stop](asio::error_code const ec, int signal) {
+  signals.async_wait([&should_stop](const asio::error_code ec, int signal) {
     should_stop = 1;
   });
 
@@ -60,6 +57,7 @@ int main(int argc, char* argv[])
   fflush(stdout);
   fflush(stderr);
 
-  // here we need to unschedule all on commit callbacks, they are preventing ring buffer to die.
+  // here we need to unschedule all on commit callbacks, they are preventing
+  // ring buffer to die.
   return 0;
 }

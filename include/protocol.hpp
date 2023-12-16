@@ -46,8 +46,10 @@ using bytes_view = std::span<const char>;
 template <typename Buffer> struct buffers_2 {
   using value_type = Buffer;
   using const_iterator = const value_type *;
-  buffers_2() : _buffer_count(0){};
-  explicit buffers_2(const value_type &buffer) : _buffer_count(1) {
+  buffers_2()
+      : _buffer_count(0){};
+  explicit buffers_2(const value_type &buffer)
+      : _buffer_count(1) {
     _buffers[0] = buffer;
   }
   buffers_2(const value_type &buffer1, const value_type &buffer2)
@@ -56,7 +58,7 @@ template <typename Buffer> struct buffers_2 {
     _buffers[1] = buffer2;
   }
 
-  const_iterator begin() const { return std::addressof(_buffers[0]); };
+  const_iterator begin() const { return std::addressof(_buffers[0]); }
   const_iterator end() const {
     return std::addressof(_buffers[0]) + _buffer_count;
   }
@@ -93,15 +95,15 @@ struct LinnearArray {
   LinnearArray &operator=(const LinnearArray &other) = delete;
 
   std::size_t size() const;
-  inline char& at(std::size_t pos) { return *(_ptr + pos); }
+  inline char &at(std::size_t pos) { return *(_ptr + pos); }
   inline const char &at(std::size_t pos) const { return *(_ptr + pos); }
 
-  inline char* data();
-  char const* data() const;
+  inline char *data();
+  const char *data() const;
 
   std::vector<char> to_vector();
 
-  private:
+private:
   int init(std::size_t minsize);
 
   char *_ptr;
@@ -112,7 +114,8 @@ struct LinnearArray {
 };
 
 struct RingBuffer {
-  RingBuffer(std::size_t size, std::size_t low_watermark, std::size_t high_watermark);
+  RingBuffer(std::size_t size, std::size_t low_watermark,
+             std::size_t high_watermark);
 
   using const_buffers_type = buffers_2<asio::const_buffer>;
   using mutable_buffers_type = buffers_2<asio::mutable_buffer>;
@@ -178,7 +181,7 @@ private:
   std::size_t _filled_size;
   std::size_t _non_filled_start;
   std::size_t _non_filled_size;
-  DestructionSignaller _destruction_signaller { "RingBuffer" };
+  DestructionSignaller _destruction_signaller{"RingBuffer"};
   std::size_t _low_watermark;
   std::size_t _high_watermark;
 };
@@ -206,9 +209,9 @@ struct Encoder {
 class infinite_timer {
 public:
   static constexpr auto interval = asio::chrono::seconds(3);
-  infinite_timer(asio::io_context& io_context);
+  infinite_timer(asio::io_context &io_context);
 
-  private:
+private:
   void start();
   asio::steady_timer timer_;
 };

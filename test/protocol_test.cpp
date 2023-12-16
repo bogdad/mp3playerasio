@@ -9,8 +9,7 @@
 
 namespace am {
 
-TEST_CASE("LinnearArray works", "[LinnearArray]")
-{
+TEST_CASE("LinnearArray works", "[LinnearArray]") {
   using namespace Catch::Matchers;
   LinnearArray arr(100);
 
@@ -19,11 +18,11 @@ TEST_CASE("LinnearArray works", "[LinnearArray]")
   REQUIRE(arr.at(1) == 0);
   arr.at(0) = 0;
   auto vec = arr.to_vector();
-  REQUIRE_THAT(vec, AllMatch(Predicate<char>([](char e) { return e == 0; }, "equal to zero")));
+  REQUIRE_THAT(vec, AllMatch(Predicate<char>([](char e) { return e == 0; },
+                                             "equal to zero")));
 }
 
-TEST_CASE("RingBuffer works", "[RingBuffer]")
-{
+TEST_CASE("RingBuffer works", "[RingBuffer]") {
   using namespace Catch::Matchers;
 
   size_t pagesize = ::sysconf(_SC_PAGESIZE);

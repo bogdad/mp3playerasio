@@ -18,8 +18,7 @@ LinnearArray::LinnearArray(std::size_t size)
     , _p1(nullptr)
     , _p2(nullptr)
     , _len(0)
-    , _shname("")
-{
+    , _shname("") {
   int res = init(size);
   if (res == -1) {
     std::terminate();
@@ -27,8 +26,7 @@ LinnearArray::LinnearArray(std::size_t size)
   _ptr = _p1;
 }
 
-LinnearArray::~LinnearArray()
-{
+LinnearArray::~LinnearArray() {
   if (_p1)
     munmap(_p1, _len);
   if (_p2)
@@ -39,19 +37,17 @@ LinnearArray::~LinnearArray()
 
 std::size_t LinnearArray::size() const { return _len; }
 
-inline char* LinnearArray::data() { return _ptr; }
+inline char *LinnearArray::data() { return _ptr; }
 
-char const* LinnearArray::data() const { return _ptr; }
+const char *LinnearArray::data() const { return _ptr; }
 
-std::vector<char> LinnearArray::to_vector()
-{
+std::vector<char> LinnearArray::to_vector() {
   auto res = std::vector<char>(size());
   memcpy(res.data(), data(), size());
   return res;
 }
 
-int LinnearArray::init(std::size_t minsize)
-{
+int LinnearArray::init(std::size_t minsize) {
   pid_t pid = getpid();
   static int counter = 0;
   std::size_t pagesize = ::sysconf(_SC_PAGESIZE);
@@ -67,7 +63,7 @@ int LinnearArray::init(std::size_t minsize)
   int r = counter++;
   std::stringstream s;
   s << "pid_" << pid << "_buffer_" << r;
-  auto const shname = s.str();
+  const auto shname = s.str();
   shm_unlink(shname.c_str());
   int fd = shm_open(shname.c_str(), O_RDWR | O_CREAT);
   _shname = shname;
@@ -76,34 +72,35 @@ int LinnearArray::init(std::size_t minsize)
     perror("ftruncate");
     return -1;
   }
-  void* p = ::mmap(nullptr, 2 * len, PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
+  void *p = ::mmap(nullptr, 2 * len, PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
   if (p == MAP_FAILED) {
     perror("mmap");
     return -1;
   }
   munmap(p, 2 * len);
 
-  _p1 = (char*)mmap(p, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+  _p1 = (char *)mmap(p, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
   if (_p1 == MAP_FAILED) {
     perror("mmap1");
     return -1;
   }
 
-  _p2 = (char*)mmap((char*)p + len, len, PROT_WRITE, MAP_SHARED | MAP_FIXED,
-      fd, 0);
+  _p2 = (char *)mmap((char *)p + len, len, PROT_WRITE, MAP_SHARED | MAP_FIXED,
+                     fd, 0);
   if (_p2 == MAP_FAILED) {
     perror("mmap2");
     return -1;
   }
   _p1[0] = 'x';
   printf("pointer %p %s: %p %p %p %ld %c %c\n", this, _shname.c_str(), p, _p1,
-      _p2, (char*)_p2 - (char*)_p1, _p1[0], _p2[0]);
+         _p2, (char *)_p2 - (char *)_p1, _p1[0], _p2[0]);
   _len = len;
   _p1[0] = 0;
   return 0;
 }
 
-RingBuffer::RingBuffer(std::size_t size, std::size_t low_watermark, std::size_t high_watermark)
+RingBuffer::RingBuffer(std::size_t size, std::size_t low_watermark,
+                       std::size_t high_watermark)
     : _data(size)
     , _size(_data.size())
     , _filled_start(0)
@@ -111,92 +108,82 @@ RingBuffer::RingBuffer(std::size_t size, std::size_t low_watermark, std::size_t 
     , _non_filled_start(0)
     , _non_filled_size(_data.size())
     , _low_watermark(low_watermark)
-    , _high_watermark(high_watermark)
-{
-}
+    , _high_watermark(high_watermark) {}
 
-void RingBuffer::reset()
-{
+void RingBuffer::reset() {
   _filled_start = 0;
   _filled_size = 0;
   _non_filled_start = 0;
   _non_filled_size = _size;
 }
 
-void RingBuffer::commit(std::size_t len)
-{
+void RingBuffer::commit(std::size_t len) {
   _non_filled_size += len;
   _filled_size -= len;
   _filled_start += len;
   _filled_start %= _size;
 }
 
-void RingBuffer::consume(std::size_t len)
-{
+void RingBuffer::consume(std::size_t len) {
   _filled_size += len;
   _non_filled_size -= len;
   _non_filled_start += len;
   _non_filled_start %= _size;
 }
 
-void RingBuffer::memcpy_in(void const* data, size_t sz)
-{
+void RingBuffer::memcpy_in(const void *data, size_t sz) {
   auto left_to_the_right = _size - _non_filled_start;
   if (sz > left_to_the_right) {
     std::memcpy(&_data.at(_non_filled_start), data, left_to_the_right);
     std::memcpy(_data.data(),
-        static_cast<char const*>(data) + left_to_the_right,
-        sz - left_to_the_right);
+                static_cast<const char *>(data) + left_to_the_right,
+                sz - left_to_the_right);
   } else {
     std::memcpy(&_data.at(_non_filled_start), data, sz);
   }
   consume(sz);
 }
 
-void RingBuffer::memcpy_out(void* data, size_t sz)
-{
+void RingBuffer::memcpy_out(void *data, size_t sz) {
   check(sz, "memcpy_out");
 
   auto left_to_the_right = _size - _filled_start;
   if (sz > left_to_the_right) {
     std::memcpy(data, &_data.at(_filled_start), left_to_the_right);
-    std::memcpy(static_cast<char*>(data) + left_to_the_right, _data.data(),
-        sz - left_to_the_right);
+    std::memcpy(static_cast<char *>(data) + left_to_the_right, _data.data(),
+                sz - left_to_the_right);
   } else {
     std::memcpy(data, &_data.at(_filled_start), sz);
   }
   commit(sz);
 }
 
-RingBuffer::const_buffers_type RingBuffer::data() const
-{
+RingBuffer::const_buffers_type RingBuffer::data() const {
   if (_filled_size == 0)
     return {};
   auto left_to_the_right = _size - _filled_start;
   if (_filled_size > left_to_the_right) {
-    return { asio::const_buffer(&_data.at(_filled_start), left_to_the_right),
-      asio::const_buffer(_data.data(), _filled_size - left_to_the_right) };
+    return {asio::const_buffer(&_data.at(_filled_start), left_to_the_right),
+            asio::const_buffer(_data.data(), _filled_size - left_to_the_right)};
   }
   return const_buffers_type(
       asio::const_buffer(&_data.at(_filled_start), _filled_size));
 }
 
-RingBuffer::const_buffers_type RingBuffer::data(std::size_t max_size) const
-{
+RingBuffer::const_buffers_type RingBuffer::data(std::size_t max_size) const {
   if (_filled_size == 0)
     return {};
   auto buf_size = std::min(_filled_size, max_size);
   auto left_to_the_right = _size - _filled_start;
   if (buf_size > left_to_the_right) {
-    return { asio::const_buffer(&_data.at(_filled_start), left_to_the_right),
-      asio::const_buffer(_data.data(), buf_size - left_to_the_right) };
+    return {asio::const_buffer(&_data.at(_filled_start), left_to_the_right),
+            asio::const_buffer(_data.data(), buf_size - left_to_the_right)};
   }
   return const_buffers_type(
       asio::const_buffer(&_data.at(_filled_start), buf_size));
 }
 
-RingBuffer::mutable_buffers_type RingBuffer::prepared()
-{
+RingBuffer::mutable_buffers_type RingBuffer::prepared() {
   if (_non_filled_size == 0) {
     return {};
   }
@@ -204,17 +191,15 @@ RingBuffer::mutable_buffers_type RingBuffer::prepared()
   if (_non_filled_size > left_to_the_right) {
     // we have 2 parts
     return {
-      asio::mutable_buffer(&_data.at(_non_filled_start), left_to_the_right),
-      asio::mutable_buffer(_data.data(),
-          _non_filled_size - left_to_the_right)
-    };
+        asio::mutable_buffer(&_data.at(_non_filled_start), left_to_the_right),
+        asio::mutable_buffer(_data.data(),
+                             _non_filled_size - left_to_the_right)};
   }
   return mutable_buffers_type(
       asio::mutable_buffer(&_data.at(_non_filled_start), _non_filled_size));
 }
 
-RingBuffer::mutable_buffers_type RingBuffer::prepared(std::size_t max_size)
-{
+RingBuffer::mutable_buffers_type RingBuffer::prepared(std::size_t max_size) {
   if (_non_filled_size == 0) {
     return {};
   }
@@ -222,9 +207,8 @@ RingBuffer::mutable_buffers_type RingBuffer::prepared(std::size_t max_size)
   auto left_to_the_right = _size - _non_filled_start;
   if (buf_size > left_to_the_right) {
     return {
-      asio::mutable_buffer(&_data.at(_non_filled_start), left_to_the_right),
-      asio::mutable_buffer(_data.data(), buf_size - left_to_the_right)
-    };
+        asio::mutable_buffer(&_data.at(_non_filled_start), left_to_the_right),
+        asio::mutable_buffer(_data.data(), buf_size - left_to_the_right)};
   }
   return mutable_buffers_type(
       asio::mutable_buffer(&_data.at(_non_filled_start), buf_size));
@@ -236,12 +220,15 @@ std::size_t RingBuffer::ready_size() const { return _filled_size; }
 
 std::size_t RingBuffer::ready_write_size() const { return _non_filled_size; }
 
-bool RingBuffer::below_watermark() const { return ready_size() < _low_watermark; }
+bool RingBuffer::below_watermark() const {
+  return ready_size() < _low_watermark;
+}
 
-bool RingBuffer::below_high_watermark() const { return ready_size() < _high_watermark; }
+bool RingBuffer::below_high_watermark() const {
+  return ready_size() < _high_watermark;
+}
 
-void RingBuffer::check(int len, std::string_view method) const
-{
+void RingBuffer::check(int len, std::string_view method) const {
   if (len > _filled_size) {
     LOG(ERROR) << "RingBuffer " << method << ": cant read " << len
                << " >= " << _filled_size << " debug " << this;
@@ -249,8 +236,7 @@ void RingBuffer::check(int len, std::string_view method) const
   }
 }
 
-inline char RingBuffer::char_at(std::size_t pos) const
-{
+inline char RingBuffer::char_at(std::size_t pos) const {
   if (pos < _size)
     return _data.at(pos);
   return _data.at(pos - _size);
@@ -261,8 +247,7 @@ using raw_int = union {
   int i;
 };
 
-int RingBuffer::peek_int() const
-{
+int RingBuffer::peek_int() const {
   check(4, "peek_int");
   int ret = 0;
   if (_filled_size + 4 < _size) {
@@ -279,50 +264,43 @@ int RingBuffer::peek_int() const
   return ret;
 }
 
-buffers_2<std::string_view> RingBuffer::peek_string_view(int len) const
-{
+buffers_2<std::string_view> RingBuffer::peek_string_view(int len) const {
   check(len, "peek_string_view");
   auto left_to_the_right = _size - _filled_start;
   if (len > left_to_the_right) {
-    return { std::string_view(&_data.at(_filled_start), left_to_the_right),
-      std::string_view(_data.data(), len - left_to_the_right) };
+    return {std::string_view(&_data.at(_filled_start), left_to_the_right),
+            std::string_view(_data.data(), len - left_to_the_right)};
   } else {
     return buffers_2(std::string_view(&_data.at(_filled_start), len));
   }
 }
 
-buffers_2<std::span<char const>> RingBuffer::peek_span(int len) const
-{
+buffers_2<std::span<const char>> RingBuffer::peek_span(int len) const {
   check(len, "peek_span");
   auto left_to_the_right = _size - _filled_start;
   if (len > left_to_the_right) {
-    return { std::span(&_data.at(_filled_start), left_to_the_right),
-      std::span(_data.data(), len - left_to_the_right) };
+    return {std::span(&_data.at(_filled_start), left_to_the_right),
+            std::span(_data.data(), len - left_to_the_right)};
   } else {
     return buffers_2(std::span(&_data.at(_filled_start), len));
   }
 }
 
-std::span<char> RingBuffer::peek_linear_span(int len)
-{
+std::span<char> RingBuffer::peek_linear_span(int len) {
   check(len, "peek_linear_span");
-  static_assert(std::same_as<LinnearArray, decltype(_data)>, "_data should be linear array, to support liear view");
-  return { &_data.at(_filled_start), static_cast<std::size_t>(len) };
+  static_assert(std::same_as<LinnearArray, decltype(_data)>,
+                "_data should be linear array, to support liear view");
+  return {&_data.at(_filled_start), static_cast<std::size_t>(len)};
 }
 
-std::size_t RingBuffer::peek_pos() const
-{
-  return _filled_start;
-}
+std::size_t RingBuffer::peek_pos() const { return _filled_start; }
 
-void Envelope::log()
-{
+void Envelope::log() {
   LOG(INFO) << "envelope message type " << message_type << " message size "
             << message_size;
 }
 
-bool Decoder::try_read(RingBuffer& state)
-{
+bool Decoder::try_read(RingBuffer &state) {
   if (_state == DecoderState::before_envelope) {
     if (state.ready_size() >= sizeof(Envelope)) {
       // we can parse the envelope now
@@ -345,39 +323,33 @@ bool Decoder::try_read(RingBuffer& state)
   }
 }
 
-void Decoder::reset()
-{
+void Decoder::reset() {
   _state = DecoderState::before_envelope;
   _envelope = {};
 }
 
-void Encoder::fill_envelope(Envelope envelope, RingBuffer& buff)
-{
+void Encoder::fill_envelope(Envelope envelope, RingBuffer &buff) {
   buff.memcpy_in(&envelope, sizeof(envelope));
 }
 
-DestructionSignaller::~DestructionSignaller()
-{
+DestructionSignaller::~DestructionSignaller() {
   LOG(INFO) << "destroying " << name;
 }
 
-static std::string make_daytime_string()
-{
+static std::string make_daytime_string() {
   using namespace std; // For time_t, time and ctime;
   time_t now = time(nullptr);
   return ctime(&now);
 }
 
-infinite_timer::infinite_timer(asio::io_context& io_context)
-    : timer_(io_context, interval)
-{
+infinite_timer::infinite_timer(asio::io_context &io_context)
+    : timer_(io_context, interval) {
   start();
 }
 
-void infinite_timer::start()
-{
+void infinite_timer::start() {
   timer_.expires_at(timer_.expires_at() + interval);
-  timer_.async_wait([this](asio::error_code const& error) {
+  timer_.async_wait([this](const asio::error_code &error) {
     LOG(INFO) << "timer! " << make_daytime_string();
     this->start();
   });
