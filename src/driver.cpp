@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
   std::srand(std::time(nullptr));
 
   if (argc != 2) {
-    LOG(INFO) << "Usage: client <host>" << std::endl;
+    LOG(INFO) << "Usage: driver <host>" << std::endl;
     return 1;
   }
 
@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     should_stop = 1;
   });
   
-  auto driver = am::Driver(io_context, strand, "localhost");
+  auto driver = am::Driver(io_context, strand, argv[1]);
   driver.play({});
 
   while (!should_stop) {
