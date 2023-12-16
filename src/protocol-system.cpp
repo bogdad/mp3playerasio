@@ -11,11 +11,11 @@
 #  include <sys/mman.h>
 #  include <unistd.h>
 #elif defined(_WIN32) || defined(_WIN64)
+#  include <windows.h>
 #  include <conio.h>
 #  include <processthreadsapi.h>
 #  include <sysinfoapi.h>
 #  include <tchar.h>
-#  include <windows.h>
 #endif
 
 namespace am {

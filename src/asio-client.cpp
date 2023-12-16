@@ -95,8 +95,9 @@ void AsioClient::connect(std::string_view host) {
       host, "8060", [this](const asio::error_code &, auto results) mutable {
         auto connection =
             TcpClientConnection::create(io_context_, strand_, mp3_stream_);
+        auto &socket = connection->socket();
         asio::async_connect(
-            connection->socket(), results,
+            socket, results,
             [connection = std::move(connection)](auto ec, auto endpoint) {
               connection->on_connect(endpoint);
             });
