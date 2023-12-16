@@ -93,15 +93,15 @@ struct LinnearArray {
   LinnearArray &operator=(const LinnearArray &other) = delete;
 
   std::size_t size() const;
-  inline char &at(std::size_t pos) { return *(_ptr + pos); }
+  inline char& at(std::size_t pos) { return *(_ptr + pos); }
   inline const char &at(std::size_t pos) const { return *(_ptr + pos); }
 
-  inline char *data();
-  const char *data() const;
+  inline char* data();
+  char const* data() const;
 
   std::vector<char> to_vector();
 
-private:
+  private:
   int init(std::size_t minsize);
 
   char *_ptr;
@@ -206,9 +206,9 @@ struct Encoder {
 class infinite_timer {
 public:
   static constexpr auto interval = asio::chrono::seconds(3);
-  infinite_timer(asio::io_context &io_context);
+  infinite_timer(asio::io_context& io_context);
 
-private:
+  private:
   void start();
   asio::steady_timer timer_;
 };
