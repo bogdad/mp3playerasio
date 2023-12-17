@@ -12,14 +12,14 @@ if defined (_WIN32)
 #endif
 
 #if defined(__APPLE__) || defined(__linux__)
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <unistd.h>
+#  include <fcntl.h>
+#  include <sys/mman.h>
+#  include <unistd.h>
 #elif defined(_WIN32) || defined(_WIN64)
-#include <conio.h>
-#include <processthreadsapi.h>
-#include <sysinfoapi.h>
-#include <tchar.h>
+#  include <conio.h>
+#  include <processthreadsapi.h>
+#  include <sysinfoapi.h>
+#  include <tchar.h>
 #endif
 
           namespace am {

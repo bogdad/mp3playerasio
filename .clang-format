@@ -9,7 +9,8 @@ BraceWrapping:
 BreakBeforeBraces: Attach
 BreakBeforeInheritanceComma: true
 BreakConstructorInitializers: BeforeComma
-IndentPPDirectives: None
+IndentPPDirectives: AfterHash
+PPIndentWidth: 2
 IndentRequiresClause: false
 IndentWidth: 2
 InsertNewlineAtEOF: true
