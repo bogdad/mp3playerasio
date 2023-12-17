@@ -95,15 +95,19 @@ private:
     send(
         [ptr]() {
           LOG(INFO) << "server: sending mp3 envelope success";
-          ptr->send_mp3_inner();
+          ptr->send_mp3_inner(ptr);
         },
         [ptr](const asio::error_code &ec) {
           LOG(ERROR) << "sending mp3 failed " << ec;
         });
   }
-  void send_mp3_inner() {
+  void send_mp3_inner(const TcpConnection::pointer &ptr) {
     LOG(INFO) << "server: calling sendfile";
-    if (_file.send(io_context_, _socket)) {
+    if (_file.send(io_context_, _socket,
+                   [ptr](std::size_t left, SendFile &inprogress) {
+                     if (left > 0)
+                       inprogress.call();
+      })) {
     } else {
       LOG(ERROR) << "sendfile failed";
       _socket.shutdown(asio::socket_base::shutdown_both);

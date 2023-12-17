@@ -23,10 +23,10 @@ struct file_deleter {
 using fhandle = std::unique_ptr<std::FILE, file_deleter>;
 
 struct Mp3 {
-
+  
   static Mp3 create(fs::path filepath);
   std::size_t size() const;
-  bool send(asio::io_context &io_context, const asio::ip::tcp::socket &socket);
+  bool send(asio::io_context &io_context, const asio::ip::tcp::socket &socket, OnChunkSent &&on_chunk_sent);
 
 private:
   Mp3(fhandle fd, size_t size)

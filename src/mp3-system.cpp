@@ -16,16 +16,34 @@ constexpr std::size_t TRANSMITFILE_MAX{(unsigned int)(2 << 30) - 1};
 
 namespace am {
 
-SendFile::SendFile(asio::io_context &io_context, asio::ip::tcp::socket &socket, std::FILE *file, std::size_t size) 
-  :io_context_(io_context), socket_(socket), file_(file), cur_(0), size_(size) {
-  #if defined(__linux__) || defined(__APPLE__)  
-  call();
-  #elif defined (_WIN32) || defined (_WIN64)
-  overlapped_ = {};
-  overlapped_.hEvent = nullptr;
-  call();
-  #endif
+#if defined(__linux__) || defined(__APPLE__)
+#elif defined(_WIN32) || defined(_WIN64)
+SendFileWin::SendFileWin(SendFileWin&& other) noexcept: 
+overlapped_(other.overlapped_), event_(std::move(other.event_)) {
+  other.event_ = nullptr;
+  other.overlapped_.hEvent = nullptr;
 }
+
+SendFileWin::~SendFileWin() {
+  if (event_) event_->cancel();
+  if (overlapped_.hEvent != nullptr) {
+    CloseHandle(overlapped_.hEvent);
+  }
+}
+#endif
+
+
+SendFile::SendFile(asio::io_context &io_context, asio::ip::tcp::socket &socket,
+                   std::FILE *file, std::size_t size, OnChunkSent &&on_chunk_sent)
+    : io_context_(io_context)
+    , socket_(socket)
+    , file_(file)
+    , cur_(0)
+    , size_(size)
+    , on_chunk_sent_(std::move(on_chunk_sent)) {
+  call();
+}
+
 
 void SendFile::call() {
   #if defined(__linux__) || defined(__APPLE__)
@@ -48,51 +66,42 @@ void SendFile::call() {
     }
   }  
   #elif defined (_WIN32) || defined (_WIN64)
-  overlapped_ = {};
+  platform_.overlapped_ = {};
   DWORD bytes = std::min(size_-cur_, TRANSMITFILE_MAX);
   auto socket = socket_.lowest_layer().native_handle();
-  if (overlapped_.hEvent != nullptr) {
-    CloseHandle(overlapped_.hEvent);
-    overlapped_.hEvent = nullptr;
+  if (platform_.overlapped_.hEvent != nullptr) {
+    CloseHandle(platform_.overlapped_.hEvent);
+    platform_.overlapped_.hEvent = nullptr;
   }
-  overlapped_.hEvent = CreateEvent(nullptr, true, true, nullptr);
-  if (!overlapped_.hEvent) {
+  platform_.overlapped_.hEvent = CreateEvent(nullptr, true, false, nullptr);
+  if (!platform_.overlapped_.hEvent) {
     std::terminate();
   }
-
-  event_.reset(new asio::windows::object_handle(io_context_, overlapped_.hEvent));
-  event_->async_wait([this](const asio::error_code &error){
+  
+  platform_.event_.reset(new asio::windows::object_handle(io_context_, platform_.overlapped_.hEvent));
+  platform_.event_->async_wait([this](const asio::error_code &error){
     if (error == asio::error::operation_aborted) {
       return;
     }
-    std::size_t bytes_written = overlapped_.InternalHigh;
+    std::size_t bytes_written = platform_.overlapped_.InternalHigh;
     cur_ += bytes_written;
     if (cur_ < size_) {
-      call();
+      on_chunk_sent_(size_-cur_, *this);
     }
   });
-  overlapped_.Offset = cur_ & 0x00000000FFFFFFFF;;
-  overlapped_.OffsetHigh = (cur_ & 0xFFFFFFFF00000000) >> 32;
+  platform_.overlapped_.Offset = cur_ & 0x00000000FFFFFFFF;;
+  platform_.overlapped_.OffsetHigh = (cur_ & 0xFFFFFFFF00000000) >> 32;
 
   auto fhandle = (HANDLE)_get_osfhandle(_fileno(file_));
 
-  if (!TransmitFile(socket, fhandle, bytes, 0, &overlapped_, nullptr, 0)) {
+  if (!TransmitFile(socket, fhandle, size_ - cur_, bytes,
+                    &platform_.overlapped_, nullptr, 0)) {
     auto err = GetLastError();
     auto wsaerr = WSAGetLastError();
     if ((err != ERROR_IO_PENDING) && (wsaerr != WSA_IO_PENDING)) {
       LOG(ERROR) << "sendfile failed ";
       std::terminate();
     }
-  }
-  #endif
-}
-
-SendFile::~SendFile() {
-  #if defined(__linux__) || defined(__APPLE__)
-  #elif defined (_WIN32) || defined (_WIN64)
-  event_->cancel();
-  if (overlapped_.hEvent != nullptr) {
-    CloseHandle(overlapped_.hEvent);
   }
   #endif
 }
