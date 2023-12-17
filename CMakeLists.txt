@@ -30,7 +30,7 @@ target_link_libraries(protocol
 	PUBLIC absl::base absl::log absl::core_headers asio::asio
 )
 
-add_library(mp3 src/mp3.cpp)
+add_library(mp3 src/mp3.cpp src/mp3-system.cpp)
 target_include_directories(mp3 PUBLIC include)
 target_link_libraries(mp3 
 	PRIVATE asio::asio absl::any_invocable absl::log)

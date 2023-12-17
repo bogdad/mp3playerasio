@@ -33,7 +33,6 @@
 #include <ostream>
 #include <string>
 #include <string_view>
-#include <sys/socket.h>
 
 #include "mp3.hpp"
 #include "protocol.hpp"
@@ -72,7 +71,8 @@ public:
 
 private:
   TcpConnection(asio::io_context &io_context, Mp3 &&file)
-      : _socket(io_context)
+      : io_context_(io_context)
+      , _socket(io_context)
       , _timer(io_context)
       , _buff(1024)
       , _file(std::move(file))
@@ -103,19 +103,7 @@ private:
   }
   void send_mp3_inner() {
     LOG(INFO) << "server: calling sendfile";
-    if (_file.send_chunk(_socket) == 0) {
-      if (_file.is_all_sent()) {
-        asio::error_code ec{};
-        // all done
-        _socket.close();
-      } else {
-        auto ptr = shared_from_this();
-        _socket.async_write_some(
-            asio::null_buffers(),
-            [ptr](const asio::error_code &error, size_t bytes_transferred) {
-              ptr->send_mp3_inner();
-            });
-      }
+    if (_file.send(io_context_, _socket)) {
     } else {
       LOG(ERROR) << "sendfile failed";
       _socket.shutdown(asio::socket_base::shutdown_both);
@@ -154,6 +142,7 @@ private:
         });
   }
 
+  asio::io_context &io_context_;
   tcp::socket _socket;
   std::string _message;
   asio::streambuf _buff;
