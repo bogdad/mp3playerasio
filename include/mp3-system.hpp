@@ -3,20 +3,19 @@
 #include <absl/functional/any_invocable.h>
 #include <asio.hpp>
 #include <asio/ip/tcp.hpp>
-#include <asio/windows/object_handle.hpp>
 #include <cstddef>
 #include <cstdio>
 
-#if defined (__LINUX__) || defined(__APPLE__)
-#include <sys/types.h>
-#elif defined (_WIN32) || defined (_WIN64)
-#include <minwinbase.h>
+#if defined(__LINUX__) || defined(__APPLE__)
+#  include <sys/types.h>
+#elif defined(_WIN32) || defined(_WIN64)
+#  include <asio/windows/object_handle.hpp>
+#  include <minwinbase.h>
 #endif
-
 
 namespace am {
 
-#if defined (__linux__) || defined (__APPLE__)
+#if defined(__linux__) || defined(__APPLE__)
 struct file_view {
   size_t _current;
   size_t _size;
@@ -24,9 +23,8 @@ struct file_view {
   void consume(size_t len);
 };
 
-struct SendFilePosix {
-};
-#elif defined (_WIN32) || defined (_WIN64)
+struct SendFilePosix {};
+#elif defined(_WIN32) || defined(_WIN64)
 struct SendFileWin {
   SendFileWin() = default;
   SendFileWin(const SendFileWin &other) = delete;
@@ -41,9 +39,11 @@ struct SendFileWin {
 #endif
 
 struct SendFile;
-using OnChunkSent = absl::AnyInvocable<void(std::size_t bytes_left, SendFile &inprogress)>;
+using OnChunkSent =
+    absl::AnyInvocable<void(std::size_t bytes_left, SendFile &inprogress)>;
 struct SendFile {
-  SendFile(asio::io_context &io_context, asio::ip::tcp::socket &socket, std::FILE *file, std::size_t size, OnChunkSent &&on_chunk_sent);
+  SendFile(asio::io_context &io_context, asio::ip::tcp::socket &socket,
+           std::FILE *file, std::size_t size, OnChunkSent &&on_chunk_sent);
   void call();
 
 private:
@@ -53,9 +53,9 @@ private:
   std::size_t cur_;
   std::size_t size_;
   OnChunkSent on_chunk_sent_;
-#if defined (__LINUX__) || defined(__APPLE__)
+#if defined(__LINUX__) || defined(__APPLE__)
   SendFilePosix platform_{};
-#elif defined (_WIN32) || defined (_WIN64)
+#elif defined(_WIN32) || defined(_WIN64)
   SendFileWin platform_{};
 #endif
 };

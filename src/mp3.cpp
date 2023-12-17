@@ -22,10 +22,12 @@ Mp3 Mp3::create(fs::path filepath) {
   return {std::move(f), sz};
 }
 
-
-bool Mp3::send(asio::io_context &io_context, const asio::ip::tcp::socket &socket, OnChunkSent &&on_chunk_sent) {
-  auto& non_const_socket = const_cast<asio::ip::tcp::socket&>(socket);
-  send_file_.emplace(io_context, non_const_socket, _fd.get(), _size, std::move(on_chunk_sent));
+bool Mp3::send(asio::io_context &io_context,
+               const asio::ip::tcp::socket &socket,
+               OnChunkSent &&on_chunk_sent) {
+  auto &non_const_socket = const_cast<asio::ip::tcp::socket &>(socket);
+  send_file_.emplace(io_context, non_const_socket, _fd.get(), _size,
+                     std::move(on_chunk_sent));
   return true;
 }
 

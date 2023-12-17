@@ -108,9 +108,9 @@ private:
                      if (left > 0) {
                        inprogress.call();
                      } else {
-                      ptr->_socket.close();
+                       ptr->_socket.close();
                      }
-      })) {
+                   })) {
     } else {
       LOG(ERROR) << "sendfile failed";
       _socket.shutdown(asio::socket_base::shutdown_both);
