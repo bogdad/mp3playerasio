@@ -1,10 +1,12 @@
 #include "mp3-system.hpp"
 #include <absl/log/log.h>
 #include <asio/error.hpp>
+#include <asio/error_code.hpp>
 #include <asio/io_context.hpp>
 #include <cstddef>
-#include <cstdint>
 #include <exception>
+#include <sys/_types/_off_t.h>
+#include <sys/socket.h>
 
 #if defined (__LINUX__) || defined(__APPLE__)
 
@@ -47,19 +49,25 @@ SendFile::SendFile(asio::io_context &io_context, asio::ip::tcp::socket &socket,
 
 void SendFile::call() {
   #if defined(__linux__) || defined(__APPLE__)
-  len = _current.len();
-  auto &non_const_socket = const_cast<asio::ip::tcp::socket &>(socket);
-  int res = sendfile(fileno(_fd.get()),
-                     non_const_socket.lowest_layer().native_handle(),
-                     _current._current, &len, nullptr, 0);
-  LOG(INFO) << "sent " << len;
+  std::size_t len = size_ - cur_;
+  off_t res_len;
+  int res = sendfile(fileno(file_),
+                     socket_.lowest_layer().native_handle(),
+                     cur_, &res_len, nullptr, 0);
+  LOG(INFO) << "sent " << res_len;
   if (res == 0) {
-    _current.consume(len);
+    cur_ += res_len;
+    on_chunk_sent_(size_-cur_, *this);
   } else {
     int err = errno;
     if (err == EAGAIN) {
-      _current.consume(len);
-      return 0;
+      cur_ += res_len;
+      socket_.async_wait(asio::ip::tcp::socket::wait_write, [this](const asio::error_code& ec){
+        if (ec == asio::error::operation_aborted) {
+          return;
+        }
+        on_chunk_sent_(size_-cur_, *this);
+      });
     } else {
       LOG(ERROR) << "sendfile failed " << res << " errno " << err;
       std::terminate();

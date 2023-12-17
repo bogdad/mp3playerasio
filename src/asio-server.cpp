@@ -105,8 +105,11 @@ private:
     LOG(INFO) << "server: calling sendfile";
     if (_file.send(io_context_, _socket,
                    [ptr](std::size_t left, SendFile &inprogress) {
-                     if (left > 0)
+                     if (left > 0) {
                        inprogress.call();
+                     } else {
+                      ptr->_socket.close();
+                     }
       })) {
     } else {
       LOG(ERROR) << "sendfile failed";

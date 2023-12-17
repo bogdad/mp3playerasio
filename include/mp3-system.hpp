@@ -6,7 +6,6 @@
 #include <asio/windows/object_handle.hpp>
 #include <cstddef>
 #include <cstdio>
-#include <memory>
 
 #if defined (__LINUX__) || defined(__APPLE__)
 #include <sys/types.h>
@@ -17,6 +16,7 @@
 
 namespace am {
 
+#if defined (__linux__) || defined (__APPLE__)
 struct file_view {
   size_t _current;
   size_t _size;
@@ -24,6 +24,9 @@ struct file_view {
   void consume(size_t len);
 };
 
+struct SendFilePosix {
+};
+#elif defined (_WIN32) || defined (_WIN64)
 struct SendFileWin {
   SendFileWin() = default;
   SendFileWin(const SendFileWin &other) = delete;
@@ -35,6 +38,7 @@ struct SendFileWin {
   OVERLAPPED overlapped_{};
   std::unique_ptr<asio::windows::object_handle> event_{};
 };
+#endif
 
 struct SendFile;
 using OnChunkSent = absl::AnyInvocable<void(std::size_t bytes_left, SendFile &inprogress)>;

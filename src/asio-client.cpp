@@ -78,7 +78,7 @@ void TcpClientConnection::receive(
           // set on low watermark retains tcp connection strongly forever.
         } else {
           ptr->mp3_stream_.buffer().consume(bytes_transferred);
-          LOG(INFO) << "client: received from network " << mp3_stream_.buffer();
+          LOG(INFO) << "client: received " << bytes_transferred << " from network " << mp3_stream_.buffer();
           handle();
           receive(std::move(on_error));
         }
