@@ -11,8 +11,8 @@
 #if defined(__LINUX__) || defined(__APPLE__)
 
 #elif defined(_WIN32) || defined(_WIN64)
-#  include <handleapi.h>
-#  include <io.h>
+#include <handleapi.h>
+#include <io.h>
 constexpr std::size_t TRANSMITFILE_MAX{(unsigned int)(2 << 30) - 1};
 #endif
 

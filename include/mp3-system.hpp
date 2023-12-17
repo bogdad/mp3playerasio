@@ -7,10 +7,10 @@
 #include <cstdio>
 
 #if defined(__LINUX__) || defined(__APPLE__)
-#  include <sys/types.h>
+#include <sys/types.h>
 #elif defined(_WIN32) || defined(_WIN64)
-#  include <asio/windows/object_handle.hpp>
-#  include <minwinbase.h>
+#include <asio/windows/object_handle.hpp>
+#include <minwinbase.h>
 #endif
 
 namespace am {
