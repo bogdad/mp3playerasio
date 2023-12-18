@@ -58,5 +58,5 @@ target_include_directories(driver PUBLIC include)
 target_link_libraries(driver 
 	PRIVATE asio::asio absl::any_invocable absl::log protocol audio-player asio-client)
 
-
+enable_testing()
 add_subdirectory(test)

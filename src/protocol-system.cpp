@@ -4,7 +4,6 @@
 #include <exception>
 #include <sstream>
 #include <string>
-#include <type_traits>
 
 #if defined(_WIN32)
 || defined(_WIN64)
@@ -22,7 +21,7 @@
 #  include <tchar.h>
 #endif
 
-        namespace am {
+namespace am {
 
   void free(LinearMemInfo & info) {
 #if defined(__APPLE__) || defined(__linux__)
@@ -99,8 +98,11 @@
     p1_[0] = 'x';
     printf("pointer %s: %p %p %p %ld %c %c\n", shname_.c_str(), p, p1_, p2_,
            (char *)p2_ - (char *)p1_, p1_[0], p2_[0]);
+    if (p1_[0] != p2_[0]) {
+      perror("not the same memory");
+      return -1;
+    }
     len_ = len;
-    p1_[0] = 0;
     res_ = 0;
 #else
   // source https://gist.github.com/rygorous/3158316
@@ -159,7 +161,7 @@
     GetSystemInfo(&sysInfo);
     return sysInfo.dwAllocationGranularity;
 #else
-  std::terminate();
+    return ::sysconf(_SC_PAGESIZE);
 #endif
   }
 
