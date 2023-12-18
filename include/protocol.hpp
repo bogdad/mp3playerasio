@@ -152,9 +152,9 @@ struct RingBuffer {
 
   template <typename Sink>
   friend void AbslStringify(Sink &sink, const RingBuffer &buffer) {
-    absl::Format(&sink, "f:[(%zu, %zu)], n:[(%zu, %zu)]", buffer._filled_start,
-                 buffer._filled_size, buffer._non_filled_start,
-                 buffer._non_filled_size);
+    absl::Format(&sink, "f:[(%zu, %zu)], n:[(%zu, %zu)]", buffer.filled_start_,
+                 buffer.filled_size_, buffer.non_filled_start_,
+                 buffer.non_filled_size_);
   }
 
   void check(int len, std::string_view method) const;
@@ -170,18 +170,18 @@ private:
   LinnearArray _data;
   // std::vector<char> _data;
   std::size_t _size;
-  std::size_t _filled_start;
-  std::size_t _filled_size;
-  std::size_t _non_filled_start;
-  std::size_t _non_filled_size;
-  DestructionSignaller _destruction_signaller{"RingBuffer"};
+  std::size_t filled_start_;
+  std::size_t filled_size_;
+  std::size_t non_filled_start_;
+  std::size_t non_filled_size_;
   std::size_t _low_watermark;
   std::size_t _high_watermark;
-  std::function<void()> on_commit_{};
+  std::function<void()> on_commit_;
+  DestructionSignaller _destruction_signaller{"RingBuffer"};
 };
 
 struct Channel {
-  using OnBufferNotFull = absl::AnyInvocable<void(void)>;
+  using OnBufferNotFull = std::function<void(void)>;
   Channel();
 
   RingBuffer &buffer() noexcept;

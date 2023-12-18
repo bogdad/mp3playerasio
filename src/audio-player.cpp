@@ -209,9 +209,6 @@ struct Mp3Stream::Pimpl {
         player_->buffer().memcpy_in(pcm.data(), decoded_size);
       }
     }
-    if (buffer.below_watermark()) {
-      on_low_watermark_();
-    }
 
     if (samples && !player_->buffer().below_watermark()) {
       if (!player_->started()) {
@@ -229,10 +226,6 @@ struct Mp3Stream::Pimpl {
               << player_->buffer().ready_size();
   }
 
-  void set_on_low_watermark(OnLowWatermark &&fun) {
-    on_low_watermark_ = std::move(fun);
-  }
-
   Channel &input_;
   asio::io_context &io_context_;
   asio::io_context::strand &strand_;
@@ -241,7 +234,6 @@ struct Mp3Stream::Pimpl {
   std::unique_ptr<Player> player_;
   int decoded_frames_{};
   std::once_flag log_mp3_format_once_;
-  OnLowWatermark on_low_watermark_;
 };
 
 void Mp3Stream::decode_next() { pimpl_->decode_next(); }

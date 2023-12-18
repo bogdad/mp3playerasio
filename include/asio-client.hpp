@@ -32,10 +32,10 @@ private:
                       asio::io_context::strand &strand, Mp3Stream &mp3_stream);
 
   void
-  receive(absl::AnyInvocable<void(const asio::error_code &) const> &&on_error);
+  receive(std::function<void(const asio::error_code &)> &&on_error);
 
   void handle();
-
+  asio::io_context::strand &strand_;
   asio::ip::tcp::socket _socket;
   // FIX lifetime
   Mp3Stream &mp3_stream_;

@@ -1,6 +1,7 @@
 #include <absl/functional/any_invocable.h>
 #include <absl/log/log.h>
 #include <absl/strings/escaping.h>
+#include <algorithm>
 #include <asio.hpp>
 #include <asio/connect.hpp>
 #include <asio/detail/socket_ops.hpp>
@@ -46,7 +47,9 @@ tcp::socket &TcpClientConnection::socket() { return _socket; }
 TcpClientConnection::TcpClientConnection(asio::io_context &io_context,
                                          asio::io_context::strand &strand,
                                          Mp3Stream &mp3_stream)
-    : _socket(io_context)
+    : 
+    strand_(strand)
+    ,_socket(io_context)
     , mp3_stream_(mp3_stream)
     , _client_decoder(
           [this](buffers_2<std::string_view> ts) {
@@ -57,12 +60,13 @@ TcpClientConnection::TcpClientConnection(asio::io_context &io_context,
           [this](RingBuffer &buff) mutable { mp3_stream_.decode_next(); }) {}
 
 void TcpClientConnection::receive(
-    absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {
+    std::function<void(const asio::error_code &)> &&on_error) {
   auto ptr = shared_from_this();
   if (mp3_stream_.buffer().buffer().ready_write_size() == 0) {
-    mp3_stream_.buffer().add_callback_on_buffer_not_full([ptr, on_error=std::move(on_error)]() mutable {
+    mp3_stream_.buffer().add_callback_on_buffer_not_full(strand_.wrap([ptr, on_error=std::move(on_error)]() mutable {
+      LOG(INFO) << "asio-client: buffer is not full anymore";
       ptr->receive(std::move(on_error));
-    });
+    }));
   } else {
   _socket.async_read_some(
       mp3_stream_.buffer().buffer().prepared(),
