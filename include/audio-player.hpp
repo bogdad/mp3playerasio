@@ -23,7 +23,7 @@ private:
   struct PimplDeleter {
     void operator()(Pimpl *);
   };
-  std::unique_ptr<Pimpl, PimplDeleter> _pimpl;
+  std::unique_ptr<Pimpl, PimplDeleter> pimpl_;
 };
 
 } // namespace am

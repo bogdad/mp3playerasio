@@ -14,13 +14,13 @@ struct LinearMemInfo {
 
   int init(std::size_t);
 
-  int _res{};
-  std::string _shname{};
-  void *_file_handle{};
-  char *_p1{};
-  char *_p2{};
+  int res_{};
+  std::string shname_{};
+  void *file_handle_{};
+  char *p1_{};
+  char *p2_{};
 
-  std::size_t _len{};
+  std::size_t len_{};
 };
 
 std::size_t system_page_size();

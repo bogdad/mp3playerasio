@@ -16,12 +16,6 @@
 namespace am {
 
 #if defined(__linux__) || defined(__APPLE__)
-struct file_view {
-  size_t _current;
-  size_t _size;
-  off_t len() const;
-  void consume(size_t len);
-};
 
 struct SendFilePosix {};
 #elif defined(_WIN32) || defined(_WIN64)

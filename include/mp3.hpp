@@ -31,11 +31,11 @@ struct Mp3 {
 
 private:
   Mp3(fhandle fd, size_t size)
-      : _fd(std::move(fd))
-      , _size(size){};
+      : fd_(std::move(fd))
+      , size_(size){};
 
-  fhandle _fd;
-  std::size_t _size;
+  fhandle fd_;
+  std::size_t size_;
   bool _started{false};
   std::optional<SendFile> send_file_{};
 };

@@ -26,19 +26,11 @@ bool Mp3::send(asio::io_context &io_context,
                const asio::ip::tcp::socket &socket,
                OnChunkSent &&on_chunk_sent) {
   auto &non_const_socket = const_cast<asio::ip::tcp::socket &>(socket);
-  send_file_.emplace(io_context, non_const_socket, _fd.get(), _size,
+  send_file_.emplace(io_context, non_const_socket, fd_.get(), size_,
                      std::move(on_chunk_sent));
   return true;
 }
 
-size_t Mp3::size() const { return _size; }
-
-off_t file_view::len() const { return _size - _current; }
-
-void file_view::consume(size_t l) {
-  if (l > len())
-    std::terminate();
-  _current += l;
-}
+size_t Mp3::size() const { return size_; }
 
 } // namespace am

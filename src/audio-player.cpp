@@ -116,28 +116,28 @@ struct Player {
     _output_buffer.memcpy_out(stream, len);
 
     if (_output_buffer.below_watermark()) {
-      _on_low_watermark();
+      on_low_watermark_();
     }
   }
   void start() {
     LOG(INFO) << "audo device started";
-    _started = true;
+    started_ = true;
     if (audio_device_.has_value())
       audio_device_->play();
   }
   void stop() {
     LOG(INFO) << "audio device stopped";
-    _started = false;
+    started_ = false;
     if (audio_device_.has_value())
       audio_device_->stop();
   }
   RingBuffer &buffer() { return _output_buffer; }
-  bool started() { return _started; }
+  bool started() { return started_; }
 
 private:
   Player(OnLowWatermark &&on_low_watermark)
       : _output_buffer(16000000, 40000, 80000)
-      , _on_low_watermark(std::move(on_low_watermark)) {}
+      , on_low_watermark_(std::move(on_low_watermark)) {}
 
   void setup_unit() {
     SDL_AudioSpec spec;
@@ -151,12 +151,12 @@ private:
     audio_device_.emplace(std::move(spec));
   }
 
-  SdlAudio _audio{};
+  SdlAudio audio_{};
   std::optional<SdlAudioDevice> audio_device_{};
   double _starting_frame_count{};
   RingBuffer _output_buffer;
-  std::atomic_bool _started{false};
-  OnLowWatermark _on_low_watermark;
+  std::atomic_bool started_{false};
+  OnLowWatermark on_low_watermark_;
 };
 
 void my_audio_callback(void *userdata, std::uint8_t *stream, int len) {
@@ -167,89 +167,89 @@ void my_audio_callback(void *userdata, std::uint8_t *stream, int len) {
 struct Mp3Stream::Pimpl {
   Pimpl(RingBuffer &input, asio::io_context &io_context,
         asio::io_context::strand &strand)
-      : _input(input)
-      , _io_context(io_context)
-      , _strand(strand)
-      , _player(Player::create([this]() {
-        asio::post(_io_context, [this]() { decode_next(); });
+      : input_(input)
+      , io_context_(io_context)
+      , strand_(strand)
+      , player_(Player::create([this]() {
+        asio::post(io_context_, [this]() { decode_next(); });
       })) {
-    mp3dec_init(&_mp3d);
+    mp3dec_init(&mp3d_);
   }
 
   void decode_next() {
-    while ((_input.ready_size() > 0) &&
-           (_player->buffer().below_high_watermark())) {
+    while ((input_.ready_size() > 0) &&
+           (player_->buffer().below_high_watermark())) {
       decode_next_inner();
     }
-    _decoded_frames = 0;
+    decoded_frames_ = 0;
   }
 
   void decode_next_inner() {
-    if (_input.peek_pos() % 200 == 0) {
+    if (input_.peek_pos() % 200 == 0) {
       log_state();
     }
     mp3dec_frame_info_t info;
     std::memset(&info, 0, sizeof(info));
     std::array<mp3d_sample_t, MINIMP3_MAX_SAMPLES_PER_FRAME> pcm;
-    auto input_size = _input.ready_size();
-    auto input_buf = _input.peek_linear_span(static_cast<int>(input_size));
+    auto input_size = input_.ready_size();
+    auto input_buf = input_.peek_linear_span(static_cast<int>(input_size));
 
     int samples = mp3dec_decode_frame(
-        &_mp3d, reinterpret_cast<uint8_t *>(input_buf.data()), input_size,
+        &mp3d_, reinterpret_cast<uint8_t *>(input_buf.data()), input_size,
         pcm.data(), &info);
-    std::call_once(_log_mp3_format_once, [&info]() { log_mp3_format(info); });
+    std::call_once(log_mp3_format_once_, [&info]() { log_mp3_format(info); });
 
     if (info.frame_bytes > 0) {
-      _input.commit(info.frame_bytes);
+      input_.commit(info.frame_bytes);
       if (samples) {
-        _decoded_frames++;
+        decoded_frames_++;
         size_t decoded_size = 2 * samples * sizeof(mp3d_sample_t);
         // auto span = std::span{pcm.data(), decoded_size};
         // _wav_file << span.data();
-        _player->buffer().memcpy_in(pcm.data(), decoded_size);
+        player_->buffer().memcpy_in(pcm.data(), decoded_size);
       }
     }
-    if (_input.below_watermark()) {
-      _on_low_watermark();
+    if (input_.below_watermark()) {
+      on_low_watermark_();
     }
 
-    if (samples && !_player->buffer().below_watermark()) {
-      if (!_player->started()) {
+    if (samples && !player_->buffer().below_watermark()) {
+      if (!player_->started()) {
         LOG(INFO) << "starting player";
-        _player->start();
+        player_->start();
       }
     }
   }
 
-  RingBuffer &buffer() { return _input; }
+  RingBuffer &buffer() { return input_; }
 
   void log_state() {
-    LOG(INFO) << "input ready " << _input.ready_size() << " output ready "
-              << _player->buffer().ready_size();
+    LOG(INFO) << "input ready " << input_.ready_size() << " output ready "
+              << player_->buffer().ready_size();
   }
 
   void set_on_low_watermark(OnLowWatermark &&fun) {
-    _on_low_watermark = std::move(fun);
+    on_low_watermark_ = std::move(fun);
   }
 
-  RingBuffer &_input;
-  asio::io_context &_io_context;
-  asio::io_context::strand &_strand;
+  RingBuffer &input_;
+  asio::io_context &io_context_;
+  asio::io_context::strand &strand_;
 
-  mp3dec_t _mp3d{};
-  std::unique_ptr<Player> _player;
-  int _decoded_frames{};
-  std::once_flag _log_mp3_format_once;
-  OnLowWatermark _on_low_watermark;
+  mp3dec_t mp3d_{};
+  std::unique_ptr<Player> player_;
+  int decoded_frames_{};
+  std::once_flag log_mp3_format_once_;
+  OnLowWatermark on_low_watermark_;
 };
 
-void Mp3Stream::decode_next() { _pimpl->decode_next(); }
+void Mp3Stream::decode_next() { pimpl_->decode_next(); }
 
 Mp3Stream::Mp3Stream(RingBuffer &input, asio::io_context &io_context,
                      asio::io_context::strand &strand)
-    : _pimpl(new Pimpl(input, io_context, strand)){};
+    : pimpl_(new Pimpl(input, io_context, strand)){};
 
-RingBuffer &Mp3Stream::buffer() { return _pimpl->buffer(); }
+RingBuffer &Mp3Stream::buffer() { return pimpl_->buffer(); }
 
 void Mp3Stream::PimplDeleter::operator()(Pimpl *pimpl) { delete pimpl; }
 } // namespace am

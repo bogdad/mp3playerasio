@@ -16,18 +16,18 @@
 namespace am {
 
 LinnearArray::LinnearArray(std::size_t size)
-    : _ptr(nullptr)
-    , _len(0)
+    : ptr_(nullptr)
+    , len_(0)
     , mapped_(size) {
-  _len = mapped_._len;
-  _ptr = mapped_._p1;
+  len_ = mapped_.len_;
+  ptr_ = mapped_.p1_;
 }
 
-std::size_t LinnearArray::size() const { return _len; }
+std::size_t LinnearArray::size() const { return len_; }
 
-inline char *LinnearArray::data() { return _ptr; }
+inline char *LinnearArray::data() { return ptr_; }
 
-const char *LinnearArray::data() const { return _ptr; }
+const char *LinnearArray::data() const { return ptr_; }
 
 std::vector<char> LinnearArray::to_vector() {
   auto res = std::vector<char>(size());

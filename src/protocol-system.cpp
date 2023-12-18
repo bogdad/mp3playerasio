@@ -26,12 +26,12 @@
 
   void free(LinearMemInfo & info) {
 #if defined(__APPLE__) || defined(__linux__)
-    if (info._p1)
-      munmap(info._p1, info._len);
-    if (info._p2)
-      munmap(info._p2, info._len);
-    if (!info._shname.empty())
-      shm_unlink(info._shname.c_str());
+    if (info.p1_)
+      munmap(info.p1_, info.len_);
+    if (info.p2_)
+      munmap(info.p2_, info.len_);
+    if (!info.shname_.empty())
+      shm_unlink(info.shname_.c_str());
 #endif
   }
 
@@ -43,12 +43,12 @@
   }
 
   LinearMemInfo::~LinearMemInfo() {
-    if (_res != 0)
+    if (res_ != 0)
       free(*this);
   }
 
   int LinearMemInfo::init(std::size_t minsize) {
-    _res = -1;
+    res_ = -1;
 // TODO: this leaks resources in error
 #if defined(__APPLE__) || defined(__linux__)
     // source https: // github.com/lava/linear_ringbuffer
@@ -70,7 +70,7 @@
     const auto shname = s.str();
     shm_unlink(shname.c_str());
     int fd = shm_open(shname.c_str(), O_RDWR | O_CREAT);
-    _shname = shname;
+    shname_ = shname;
     std::size_t len = bytes;
     if (ftruncate(fd, len) == -1) {
       perror("ftruncate");
@@ -84,24 +84,24 @@
     }
     munmap(p, 2 * len);
 
-    _p1 = (char *)mmap(p, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
-    if (_p1 == MAP_FAILED) {
+    p1_ = (char *)mmap(p, len, PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
+    if (p1_ == MAP_FAILED) {
       perror("mmap1");
       return -1;
     }
 
-    _p2 = (char *)mmap((char *)p + len, len, PROT_WRITE, MAP_SHARED | MAP_FIXED,
+    p2_ = (char *)mmap((char *)p + len, len, PROT_WRITE, MAP_SHARED | MAP_FIXED,
                        fd, 0);
-    if (_p2 == MAP_FAILED) {
+    if (p2_ == MAP_FAILED) {
       perror("mmap2");
       return -1;
     }
-    _p1[0] = 'x';
-    printf("pointer %s: %p %p %p %ld %c %c\n", _shname.c_str(), p, _p1, _p2,
-           (char *)_p2 - (char *)_p1, _p1[0], _p2[0]);
-    _len = len;
-    _p1[0] = 0;
-    _res = 0;
+    p1_[0] = 'x';
+    printf("pointer %s: %p %p %p %ld %c %c\n", shname_.c_str(), p, p1_, p2_,
+           (char *)p2_ - (char *)p1_, p1_[0], p2_[0]);
+    len_ = len;
+    p1_[0] = 0;
+    res_ = 0;
 #else
   // source https://gist.github.com/rygorous/3158316
   DWORD pid = GetCurrentProcessId();

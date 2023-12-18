@@ -46,52 +46,52 @@ template <typename Buffer> struct buffers_2 {
   using value_type = Buffer;
   using const_iterator = const value_type *;
   buffers_2()
-      : _buffer_count(0){};
+      : buffer_count_(0){};
   explicit buffers_2(const value_type &buffer)
-      : _buffer_count(1) {
-    _buffers[0] = buffer;
+      : buffer_count_(1) {
+    buffers_[0] = buffer;
   }
   buffers_2(const value_type &buffer1, const value_type &buffer2)
-      : _buffer_count(2) {
-    _buffers[0] = buffer1;
-    _buffers[1] = buffer2;
+      : buffer_count_(2) {
+    buffers_[0] = buffer1;
+    buffers_[1] = buffer2;
   }
 
-  const_iterator begin() const { return std::addressof(_buffers[0]); }
+  const_iterator begin() const { return std::addressof(buffers_[0]); }
   const_iterator end() const {
-    return std::addressof(_buffers[0]) + _buffer_count;
+    return std::addressof(buffers_[0]) + buffer_count_;
   }
-  bool empty() const { return !_buffer_count; }
+  bool empty() const { return !buffer_count_; }
 
   std::size_t size() const {
-    if (_buffer_count == 0)
+    if (buffer_count_ == 0)
       return 0;
-    auto res = size_t(_buffers[0].size());
-    if (_buffer_count == 2)
-      res += _buffers[1].size();
+    auto res = size_t(buffers_[0].size());
+    if (buffer_count_ == 2)
+      res += buffers_[1].size();
     return res;
   }
 
   inline std::byte &operator[](size_t pos) const {
-    auto b0size = _buffers[0].size();
+    auto b0size = buffers_[0].size();
     if (pos < b0size) {
-      return _buffers[0][pos];
+      return buffers_[0][pos];
     }
-    return _buffers[1][pos - b0size];
+    return buffers_[1][pos - b0size];
   }
 
-  inline std::size_t count() const { return _buffer_count; }
+  inline std::size_t count() const { return buffer_count_; }
 
 private:
-  std::array<Buffer, 2> _buffers;
-  std::size_t _buffer_count;
+  std::array<Buffer, 2> buffers_;
+  std::size_t buffer_count_;
 };
 
 struct LinnearArray {
   LinnearArray(std::size_t size);
   std::size_t size() const;
-  inline char &at(std::size_t pos) { return *(_ptr + pos); }
-  inline const char &at(std::size_t pos) const { return *(_ptr + pos); }
+  inline char &at(std::size_t pos) { return *(ptr_ + pos); }
+  inline const char &at(std::size_t pos) const { return *(ptr_ + pos); }
 
   inline char *data();
   const char *data() const;
@@ -99,8 +99,8 @@ struct LinnearArray {
   std::vector<char> to_vector();
 
 private:
-  char *_ptr;
-  std::size_t _len;
+  char *ptr_;
+  std::size_t len_;
   LinearMemInfo mapped_;
 };
 

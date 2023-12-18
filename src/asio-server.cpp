@@ -168,15 +168,15 @@ private:
 class TcpServer {
 public:
   TcpServer(asio::io_context &io_context)
-      : _io_context(io_context)
-      , _acceptor(io_context, tcp::endpoint(tcp::v4(), 8060)) {
+      : io_context_(io_context)
+      , acceptor_(io_context, tcp::endpoint(tcp::v4(), 8060)) {
     start_accept();
   }
 
 private:
   void start_accept() {
-    TcpConnection::pointer new_connection = TcpConnection::create(_io_context);
-    _acceptor.async_accept(
+    TcpConnection::pointer new_connection = TcpConnection::create(io_context_);
+    acceptor_.async_accept(
         new_connection->socket(),
         [this, new_connection](const asio::error_code &error) {
           this->handle_accept(new_connection, error);
@@ -192,8 +192,8 @@ private:
     start_accept();
   }
 
-  asio::io_context &_io_context;
-  tcp::acceptor _acceptor;
+  asio::io_context &io_context_;
+  tcp::acceptor acceptor_;
 };
 
 } // namespace am

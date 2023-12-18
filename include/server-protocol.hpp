@@ -10,10 +10,10 @@ namespace am {
 struct ServerDecoder : Decoder {
   ServerDecoder(
       absl::AnyInvocable<void(buffers_2<std::string_view>)> on_message)
-      : _on_message(std::move(on_message)) {}
+      : on_message_(std::move(on_message)) {}
 
   void try_read_server(RingBuffer &state);
-  absl::AnyInvocable<void(buffers_2<std::string_view>)> _on_message;
+  absl::AnyInvocable<void(buffers_2<std::string_view>)> on_message_;
 };
 
 struct ServerEncoder : Encoder {

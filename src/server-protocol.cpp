@@ -11,7 +11,7 @@ void ServerDecoder::try_read_server(RingBuffer &state) {
       // get time
       if (state.ready_size() >= _envelope.message_size) {
         // got time
-        _on_message(state.peek_string_view(_envelope.message_size));
+        on_message_(state.peek_string_view(_envelope.message_size));
         state.commit(_envelope.message_size);
         reset();
         try_read_server(state);
