@@ -22,7 +22,7 @@ public:
   void play(Song &&song);
 
 private:
-  am::RingBuffer buffer_;
+  Channel buffer_{};
   asio::io_context &context_;
   asio::io_context::strand &strand_;
   asio::executor_work_guard<decltype(context_.get_executor())> work_guard_;

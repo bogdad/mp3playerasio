@@ -10,11 +10,9 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
-#include <exception>
+#include <functional>
 #include <memory>
-#include <mutex>
 #include <span>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -104,6 +102,8 @@ private:
   LinearMemInfo mapped_;
 };
 
+struct Channel;
+
 struct RingBuffer {
   RingBuffer(std::size_t size, std::size_t low_watermark,
              std::size_t high_watermark);
@@ -148,6 +148,7 @@ struct RingBuffer {
   std::size_t ready_write_size() const;
   bool below_watermark() const;
   bool below_high_watermark() const;
+  bool below_low_watermark() const;
 
   template <typename Sink>
   friend void AbslStringify(Sink &sink, const RingBuffer &buffer) {
@@ -164,6 +165,7 @@ struct RingBuffer {
   std::span<char> peek_linear_span(int len);
   std::size_t peek_pos() const;
 
+  friend class Channel;
 private:
   LinnearArray _data;
   // std::vector<char> _data;
@@ -175,7 +177,20 @@ private:
   DestructionSignaller _destruction_signaller{"RingBuffer"};
   std::size_t _low_watermark;
   std::size_t _high_watermark;
+  std::function<void()> on_commit_{};
 };
+
+struct Channel {
+  using OnBufferNotFull = absl::AnyInvocable<void(void)>;
+  Channel();
+
+  RingBuffer &buffer() noexcept;
+  void add_callback_on_buffer_not_full(OnBufferNotFull &&callback) noexcept;
+
+  RingBuffer buffer_{300000, 40000, 80000};
+  std::vector<OnBufferNotFull> callbacks_on_not_full_{};
+};
+
 
 struct Envelope {
   void log();

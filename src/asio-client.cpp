@@ -59,12 +59,17 @@ TcpClientConnection::TcpClientConnection(asio::io_context &io_context,
 void TcpClientConnection::receive(
     absl::AnyInvocable<void(const asio::error_code &) const> &&on_error) {
   auto ptr = shared_from_this();
+  if (mp3_stream_.buffer().buffer().ready_write_size() == 0) {
+    mp3_stream_.buffer().add_callback_on_buffer_not_full([ptr, on_error=std::move(on_error)]() mutable {
+      ptr->receive(std::move(on_error));
+    });
+  } else {
   _socket.async_read_some(
-      mp3_stream_.buffer().prepared(),
+      mp3_stream_.buffer().buffer().prepared(),
       [this, ptr = std::move(ptr), on_error = std::move(on_error)](
           const asio::error_code &ec, const size_t bytes_transferred) mutable {
         if (ec) {
-          LOG(INFO) << "client: received " << mp3_stream_.buffer() << " error "
+          LOG(INFO) << "client: received " << mp3_stream_.buffer().buffer() << " error "
                     << ec << " bytes available " << _socket.available();
           on_error(ec);
           // we did not parse the whole read_buffer yet, we schedule a callback
@@ -77,18 +82,19 @@ void TcpClientConnection::receive(
           // });
           // set on low watermark retains tcp connection strongly forever.
         } else {
-          ptr->mp3_stream_.buffer().consume(bytes_transferred);
+          ptr->mp3_stream_.buffer().buffer().consume(bytes_transferred);
           LOG(INFO) << "client: received " << bytes_transferred
-                    << " from network " << mp3_stream_.buffer();
+                    << " from network " << mp3_stream_.buffer().buffer();
           handle();
           receive(std::move(on_error));
         }
       });
+  }
 }
 
 void TcpClientConnection::handle() {
-  _client_decoder.try_read_client(mp3_stream_.buffer());
-  LOG(INFO) << "client: handled " << mp3_stream_.buffer();
+  _client_decoder.try_read_client(mp3_stream_.buffer().buffer());
+  LOG(INFO) << "client: handled " << mp3_stream_.buffer().buffer();
 }
 
 void AsioClient::connect(std::string_view host) {

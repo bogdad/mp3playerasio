@@ -11,9 +11,8 @@ using asio::ip::tcp;
 namespace am {
 
 Driver::Driver(asio::io_context &io_context, asio::io_context::strand &strand,
-               std::string &&host)
-    : buffer_(100000, 40000, 80000)
-    , context_(io_context)
+               std::string &&host):
+    context_(io_context)
     , strand_(strand)
     , work_guard_(io_context.get_executor())
     , host_(std::move(host))

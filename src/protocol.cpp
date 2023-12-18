@@ -164,6 +164,10 @@ bool RingBuffer::below_high_watermark() const {
   return ready_size() < _high_watermark;
 }
 
+bool RingBuffer::below_low_watermark() const {
+  return ready_size() < _high_watermark;
+}
+
 void RingBuffer::check(int len, std::string_view method) const {
   if (len > _filled_size) {
     LOG(ERROR) << "RingBuffer " << method << ": cant read " << len
@@ -230,6 +234,27 @@ std::span<char> RingBuffer::peek_linear_span(int len) {
 }
 
 std::size_t RingBuffer::peek_pos() const { return _filled_start; }
+
+Channel::Channel() {
+  buffer_.on_commit_ = [this](){
+    if (!buffer_.below_low_watermark()) {
+      return;
+    };
+    decltype(callbacks_on_not_full_) tmp{};
+    std::swap(tmp, callbacks_on_not_full_);
+    for(auto &&callback: tmp) {
+      callback();
+    }
+  };
+}
+
+RingBuffer& Channel::buffer() noexcept {
+  return buffer_;
+}
+
+void Channel::add_callback_on_buffer_not_full(Channel::OnBufferNotFull &&callback) noexcept {
+  callbacks_on_not_full_.emplace_back(std::move(callback));
+}
 
 void Envelope::log() {
   LOG(INFO) << "envelope message type " << message_type << " message size "

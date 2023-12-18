@@ -17,7 +17,6 @@
 #include <mutex>
 #include <optional>
 #include <ostream>
-#include <span>
 #include <stdexcept>
 #include <utility>
 
@@ -165,7 +164,7 @@ void my_audio_callback(void *userdata, std::uint8_t *stream, int len) {
 }
 
 struct Mp3Stream::Pimpl {
-  Pimpl(RingBuffer &input, asio::io_context &io_context,
+  Pimpl(Channel &input, asio::io_context &io_context,
         asio::io_context::strand &strand)
       : input_(input)
       , io_context_(io_context)
@@ -177,7 +176,7 @@ struct Mp3Stream::Pimpl {
   }
 
   void decode_next() {
-    while ((input_.ready_size() > 0) &&
+    while ((input_.buffer().ready_size() > 0) &&
            (player_->buffer().below_high_watermark())) {
       decode_next_inner();
     }
@@ -185,14 +184,15 @@ struct Mp3Stream::Pimpl {
   }
 
   void decode_next_inner() {
-    if (input_.peek_pos() % 200 == 0) {
+    if (input_.buffer().peek_pos() % 200 == 0) {
       log_state();
     }
     mp3dec_frame_info_t info;
     std::memset(&info, 0, sizeof(info));
     std::array<mp3d_sample_t, MINIMP3_MAX_SAMPLES_PER_FRAME> pcm;
-    auto input_size = input_.ready_size();
-    auto input_buf = input_.peek_linear_span(static_cast<int>(input_size));
+    auto &buffer = input_.buffer();
+    auto input_size = buffer.ready_size();
+    auto input_buf = buffer.peek_linear_span(static_cast<int>(input_size));
 
     int samples = mp3dec_decode_frame(
         &mp3d_, reinterpret_cast<uint8_t *>(input_buf.data()), input_size,
@@ -200,7 +200,7 @@ struct Mp3Stream::Pimpl {
     std::call_once(log_mp3_format_once_, [&info]() { log_mp3_format(info); });
 
     if (info.frame_bytes > 0) {
-      input_.commit(info.frame_bytes);
+      buffer.commit(info.frame_bytes);
       if (samples) {
         decoded_frames_++;
         size_t decoded_size = 2 * samples * sizeof(mp3d_sample_t);
@@ -209,7 +209,7 @@ struct Mp3Stream::Pimpl {
         player_->buffer().memcpy_in(pcm.data(), decoded_size);
       }
     }
-    if (input_.below_watermark()) {
+    if (buffer.below_watermark()) {
       on_low_watermark_();
     }
 
@@ -221,10 +221,11 @@ struct Mp3Stream::Pimpl {
     }
   }
 
-  RingBuffer &buffer() { return input_; }
+  Channel &buffer() { return input_; }
 
   void log_state() {
-    LOG(INFO) << "input ready " << input_.ready_size() << " output ready "
+    auto &buffer = input_.buffer();
+    LOG(INFO) << "input ready " << buffer.ready_size() << " output ready "
               << player_->buffer().ready_size();
   }
 
@@ -232,7 +233,7 @@ struct Mp3Stream::Pimpl {
     on_low_watermark_ = std::move(fun);
   }
 
-  RingBuffer &input_;
+  Channel &input_;
   asio::io_context &io_context_;
   asio::io_context::strand &strand_;
 
@@ -245,11 +246,11 @@ struct Mp3Stream::Pimpl {
 
 void Mp3Stream::decode_next() { pimpl_->decode_next(); }
 
-Mp3Stream::Mp3Stream(RingBuffer &input, asio::io_context &io_context,
+Mp3Stream::Mp3Stream(Channel &input, asio::io_context &io_context,
                      asio::io_context::strand &strand)
     : pimpl_(new Pimpl(input, io_context, strand)){};
 
-RingBuffer &Mp3Stream::buffer() { return pimpl_->buffer(); }
+Channel &Mp3Stream::buffer() { return pimpl_->buffer(); }
 
 void Mp3Stream::PimplDeleter::operator()(Pimpl *pimpl) { delete pimpl; }
 } // namespace am
