@@ -63,9 +63,13 @@ void TcpClientConnection::receive(
     std::function<void(const asio::error_code &)> &&on_error) {
   auto ptr = shared_from_this();
   if (mp3_stream_.buffer().buffer().ready_write_size() == 0) {
-    mp3_stream_.buffer().add_callback_on_buffer_not_full(strand_.wrap([ptr, on_error=std::move(on_error)]() mutable {
-      ptr->receive(std::move(on_error));
-    }));
+    mp3_stream_.buffer().add_callback_on_buffer_not_full(
+      OnBufferNotFullSz {
+      strand_.wrap([ptr, on_error=std::move(on_error)]() mutable {
+        ptr->receive(std::move(on_error));
+      }),
+      1 // as soon as 1 byte is available
+    });
   } else {
   _socket.async_read_some(
       mp3_stream_.buffer().buffer().prepared(),

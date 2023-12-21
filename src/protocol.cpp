@@ -158,10 +158,6 @@ std::size_t RingBuffer::ready_size() const { return filled_size_; }
 
 std::size_t RingBuffer::ready_write_size() const { return non_filled_size_; }
 
-bool RingBuffer::below_watermark() const {
-  return ready_size() < _low_watermark;
-}
-
 bool RingBuffer::below_high_watermark() const {
   return ready_size() < _high_watermark;
 }
@@ -245,7 +241,11 @@ Channel::Channel() {
     decltype(callbacks_on_not_full_) tmp{};
     std::swap(tmp, callbacks_on_not_full_);
     for(auto &&callback: tmp) {
-      callback();
+      if (callback.wants_size_ <= buffer_.ready_write_size()) {
+        callback.callback_();
+      } else {
+        callbacks_on_not_full_.emplace_back(callback);
+      }
     }
   };
 }
@@ -296,7 +296,7 @@ void Encoder::fill_envelope(Envelope envelope, RingBuffer &buff) {
 }
 
 DestructionSignaller::~DestructionSignaller() {
-  LOG(INFO) << "destroying " << name;
+  LOG(INFO) << "destroying " << name_;
 }
 
 static std::string make_daytime_string() {

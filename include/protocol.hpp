@@ -31,7 +31,10 @@ server sends mp3 offset
 namespace am {
 
 struct DestructionSignaller {
-  std::string name;
+  std::string name_;
+  DestructionSignaller(std::string&& name): name_(std::move(name)){}
+  DestructionSignaller(const DestructionSignaller&) = default;
+  DestructionSignaller(DestructionSignaller&&) = default;
   ~DestructionSignaller();
 };
 
@@ -146,7 +149,6 @@ struct RingBuffer {
   bool empty() const;
   std::size_t ready_size() const;
   std::size_t ready_write_size() const;
-  bool below_watermark() const;
   bool below_high_watermark() const;
   bool below_low_watermark() const;
 
@@ -168,7 +170,7 @@ struct RingBuffer {
   friend class Channel;
 private:
   LinnearArray _data;
-  // std::vector<char> _data;
+
   std::size_t _size;
   std::size_t filled_start_;
   std::size_t filled_size_;
@@ -180,14 +182,19 @@ private:
   DestructionSignaller _destruction_signaller{"RingBuffer"};
 };
 
+struct OnBufferNotFullSz {
+  std::function<void(void)> callback_;
+  std::size_t wants_size_;
+};
+
 struct Channel {
-  using OnBufferNotFull = std::function<void(void)>;
+  using OnBufferNotFull = OnBufferNotFullSz;
   Channel();
 
   RingBuffer &buffer() noexcept;
   void add_callback_on_buffer_not_full(OnBufferNotFull &&callback) noexcept;
 
-  RingBuffer buffer_{10000, 3000, 6000};
+  RingBuffer buffer_{65535, 20000, 40000};
   std::vector<OnBufferNotFull> callbacks_on_not_full_{};
 };
 

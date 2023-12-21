@@ -103,7 +103,7 @@ struct Player {
   }
 
   void callback(std::uint8_t *stream, int len) {
-    auto audio_len = static_cast<int>(_output_buffer.ready_size());
+    auto audio_len = static_cast<int>(_output_buffer.buffer().ready_size());
     if (audio_len == 0) {
       stop();
       return;
@@ -119,9 +119,9 @@ struct Player {
     total_buff_count_++;
 
     len = (len > audio_len ? audio_len : len);
-    _output_buffer.memcpy_out(stream, len);
+    _output_buffer.buffer().memcpy_out(stream, len);
 
-    if (_output_buffer.below_watermark()) {
+    if (_output_buffer.buffer().below_low_watermark()) {
       on_low_watermark_();
     }
   }
@@ -137,7 +137,7 @@ struct Player {
     if (audio_device_.has_value())
       audio_device_->stop();
   }
-  RingBuffer &buffer() { return _output_buffer; }
+  Channel &buffer() { return _output_buffer; }
   bool started() { return started_; }
 
   auto stats() const {
@@ -159,8 +159,7 @@ struct Player {
   }
 private:
   Player(OnLowWatermark &&on_low_watermark)
-      : _output_buffer(100000, 40000, 80000)
-      , on_low_watermark_(std::move(on_low_watermark)) {}
+      : on_low_watermark_(std::move(on_low_watermark)) {}
 
   void setup_unit() {
     SDL_AudioSpec spec;
@@ -177,7 +176,7 @@ private:
   SdlAudio audio_{};
   std::optional<SdlAudioDevice> audio_device_{};
   double _starting_frame_count{};
-  RingBuffer _output_buffer;
+  Channel _output_buffer{};
   std::atomic_bool started_{false};
   OnLowWatermark on_low_watermark_;
   std::atomic_int underflows_{};
@@ -206,14 +205,22 @@ struct Mp3Stream::Pimpl {
   }
 
   void decode_next() {
-    while ((input_.buffer().ready_size() > 0) &&
-           (player_->buffer().below_high_watermark())) {
+    if (waiting_for_play_) {
+      return;
+    }
+    while ((input_.buffer().ready_size() > 0) && player_->buffer().buffer().below_high_watermark()) {
+      // TODO: would we loose data if output buffer is not below high watermark and input is empty? ie noone will call us again 
+      // no, because in below-low-watermark we will restart decode next.
       decode_next_inner();
+      if (waiting_for_play_) break;
+    }
+    if (input_.buffer().ready_size() == 0) {
+      return;
     }
     decoded_frames_ = 0;
     auto stats = player_->stats();
     auto &[total, underflow, total_len, total_len_count, total_buff_size, total_buff_count] = stats;
-    if (total - stats_last_total_ > 99) {
+    if (total - stats_last_total_ > 399) {
       LOG(INFO) << "callback stats " << " total " << total << " underflow " << underflow << " " << 100*underflow / total << "%";
       auto avg = total_len_count > 0 ? total_len / total_len_count : 0;
       LOG(INFO) << "callback stats " << " total_len " << total_len << " total_len_count " << total_len_count << " average " << avg;
@@ -239,19 +246,31 @@ struct Mp3Stream::Pimpl {
         &mp3d_, reinterpret_cast<uint8_t *>(input_buf.data()), input_size,
         pcm.data(), &info);
     std::call_once(log_mp3_format_once_, [&info]() { log_mp3_format(info); });
-
+    auto &player_buffer = player_->buffer().buffer();
     if (info.frame_bytes > 0) {
-      buffer.commit(info.frame_bytes);
-      if (samples) {
-        decoded_frames_++;
-        size_t decoded_size = 2 * samples * sizeof(mp3d_sample_t);
-        // auto span = std::span{pcm.data(), decoded_size};
-        // _wav_file << span.data();
-        player_->buffer().memcpy_in(pcm.data(), decoded_size);
+      size_t decoded_size = 2 * samples * sizeof(mp3d_sample_t);
+      if (decoded_size > player_buffer.ready_write_size()) {
+        LOG(INFO) << "decode_next: want to put " << decoded_size << " can put " << player_buffer.ready_write_size();
+        waiting_for_play_ = true;
+        player_->buffer().add_callback_on_buffer_not_full(OnBufferNotFullSz {
+        // TODO: check lifetime of this
+        strand_.wrap([this](){
+          waiting_for_play_ = false;
+          decode_next();
+        }), 
+        decoded_size
+      });
+      } else {
+        buffer.commit(info.frame_bytes);
+        if (samples) {
+          decoded_frames_++;
+          // TODO: what if it does not fit
+          player_buffer.memcpy_in(pcm.data(), decoded_size);
+        }
       }
     }
 
-    if (samples && !player_->buffer().below_watermark()) {
+    if (samples && !player_->buffer().buffer().below_low_watermark()) {
       if (!player_->started()) {
         LOG(INFO) << "starting player";
         player_->start();
@@ -264,7 +283,7 @@ struct Mp3Stream::Pimpl {
   void log_state() {
     auto &buffer = input_.buffer();
     LOG(INFO) << "input ready " << buffer.ready_size() << " output ready "
-              << player_->buffer().ready_size();
+              << player_->buffer().buffer().ready_size();
   }
 
   Channel &input_;
@@ -276,6 +295,7 @@ struct Mp3Stream::Pimpl {
   int decoded_frames_{};
   std::once_flag log_mp3_format_once_;
   int stats_last_total_ {-100};
+  bool waiting_for_play_ {false};
 };
 
 void Mp3Stream::decode_next() { pimpl_->decode_next(); }
