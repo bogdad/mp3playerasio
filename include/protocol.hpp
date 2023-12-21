@@ -187,7 +187,7 @@ struct Channel {
   RingBuffer &buffer() noexcept;
   void add_callback_on_buffer_not_full(OnBufferNotFull &&callback) noexcept;
 
-  RingBuffer buffer_{300000, 40000, 80000};
+  RingBuffer buffer_{10000, 3000, 6000};
   std::vector<OnBufferNotFull> callbacks_on_not_full_{};
 };
 

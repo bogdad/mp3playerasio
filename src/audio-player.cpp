@@ -18,6 +18,7 @@
 #include <optional>
 #include <ostream>
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 
 #define MINIMP3_IMPLEMENTATION
@@ -103,14 +104,20 @@ struct Player {
 
   void callback(std::uint8_t *stream, int len) {
     auto audio_len = static_cast<int>(_output_buffer.ready_size());
-    // LOG(INFO) << "callback " << (void *) stream << " len " << len <<
-    // "ready_size " << audio_len;
-
     if (audio_len == 0) {
       stop();
       return;
     }
     std::memset(stream, 0, len);
+    if (len > audio_len) {
+      underflows_++;
+    }
+    total_callbacks_++;
+    total_len_ += len;
+    total_len_count_++;
+    total_buff_size_ += audio_len;
+    total_buff_count_++;
+
     len = (len > audio_len ? audio_len : len);
     _output_buffer.memcpy_out(stream, len);
 
@@ -133,9 +140,26 @@ struct Player {
   RingBuffer &buffer() { return _output_buffer; }
   bool started() { return started_; }
 
+  auto stats() const {
+    auto total = total_callbacks_.load(std::memory_order::relaxed);
+    auto underflow = underflows_.load(std::memory_order::relaxed);
+    auto total_len = total_len_.load(std::memory_order::relaxed);
+    auto total_len_count = total_len_count_.load(std::memory_order::relaxed);
+    auto total_buff_size = total_buff_size_.load(std::memory_order::relaxed);
+    auto total_buff_count = total_buff_count_.load(std::memory_order::relaxed);
+
+    auto res = std::make_tuple(total, underflow, total_len, total_len_count, total_buff_size, total_buff_count);
+    return res;
+  }
+  void reset_stat() {
+    total_len_ = 0;
+    total_len_count_ = 0;
+    total_buff_size_ = 0;
+    total_buff_count_ = 0;
+  }
 private:
   Player(OnLowWatermark &&on_low_watermark)
-      : _output_buffer(16000000, 40000, 80000)
+      : _output_buffer(100000, 40000, 80000)
       , on_low_watermark_(std::move(on_low_watermark)) {}
 
   void setup_unit() {
@@ -156,6 +180,12 @@ private:
   RingBuffer _output_buffer;
   std::atomic_bool started_{false};
   OnLowWatermark on_low_watermark_;
+  std::atomic_int underflows_{};
+  std::atomic_int total_callbacks_ {};
+  std::atomic_int total_len_{};
+  std::atomic_int total_len_count_{};
+  std::atomic_long total_buff_size_{};
+  std::atomic_int total_buff_count_{};
 };
 
 void my_audio_callback(void *userdata, std::uint8_t *stream, int len) {
@@ -181,11 +211,22 @@ struct Mp3Stream::Pimpl {
       decode_next_inner();
     }
     decoded_frames_ = 0;
+    auto stats = player_->stats();
+    auto &[total, underflow, total_len, total_len_count, total_buff_size, total_buff_count] = stats;
+    if (total - stats_last_total_ > 99) {
+      LOG(INFO) << "callback stats " << " total " << total << " underflow " << underflow << " " << 100*underflow / total << "%";
+      auto avg = total_len_count > 0 ? total_len / total_len_count : 0;
+      LOG(INFO) << "callback stats " << " total_len " << total_len << " total_len_count " << total_len_count << " average " << avg;
+      auto avg_buff = total_buff_count > 0 ? total_buff_size / total_buff_count : 0;
+      LOG(INFO) << "callback stats " << " total_buff_len " << total_buff_size << " total_len_count " << total_buff_count << " average " << avg_buff;
+      stats_last_total_ = total;
+      player_->reset_stat();
+    }
   }
 
   void decode_next_inner() {
     if (input_.buffer().peek_pos() % 200 == 0) {
-      log_state();
+      // log_state();
     }
     mp3dec_frame_info_t info;
     std::memset(&info, 0, sizeof(info));
@@ -234,6 +275,7 @@ struct Mp3Stream::Pimpl {
   std::unique_ptr<Player> player_;
   int decoded_frames_{};
   std::once_flag log_mp3_format_once_;
+  int stats_last_total_ {-100};
 };
 
 void Mp3Stream::decode_next() { pimpl_->decode_next(); }

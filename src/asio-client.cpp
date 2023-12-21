@@ -1,7 +1,7 @@
 #include <absl/functional/any_invocable.h>
 #include <absl/log/log.h>
 #include <absl/strings/escaping.h>
-#include <algorithm>
+
 #include <asio.hpp>
 #include <asio/connect.hpp>
 #include <asio/detail/socket_ops.hpp>
@@ -64,7 +64,6 @@ void TcpClientConnection::receive(
   auto ptr = shared_from_this();
   if (mp3_stream_.buffer().buffer().ready_write_size() == 0) {
     mp3_stream_.buffer().add_callback_on_buffer_not_full(strand_.wrap([ptr, on_error=std::move(on_error)]() mutable {
-      LOG(INFO) << "asio-client: buffer is not full anymore";
       ptr->receive(std::move(on_error));
     }));
   } else {
@@ -98,7 +97,7 @@ void TcpClientConnection::receive(
 
 void TcpClientConnection::handle() {
   _client_decoder.try_read_client(mp3_stream_.buffer().buffer());
-  LOG(INFO) << "client: handled " << mp3_stream_.buffer().buffer();
+  // LOG(INFO) << "client: handled " << mp3_stream_.buffer().buffer();
 }
 
 void AsioClient::connect(std::string_view host) {
