@@ -9,5 +9,3 @@ sdl/2.28.5
 CMakeDeps
 CMakeToolchain
 
-[layout]
-cmake_layout
