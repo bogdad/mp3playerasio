@@ -33,7 +33,7 @@ TcpClientConnection::create(asio::io_context &io_context,
   return res;
 }
 
-void TcpClientConnection::on_connect(asio::ip::tcp::endpoint endpoint) {
+void TcpClientConnection::on_connect() {
   auto ptr = shared_from_this();
   receive([ptr = std::move(ptr), this](auto ec) {
     if (ec == asio::error::eof) {
@@ -112,8 +112,8 @@ void AsioClient::connect(std::string_view host) {
         auto &socket = connection->socket();
         asio::async_connect(
             socket, results,
-            [connection = std::move(connection)](auto ec, auto endpoint) {
-              connection->on_connect(endpoint);
+            [connection = std::move(connection)](const auto& ec, const auto& endpoint) {
+              connection->on_connect();
             });
       });
 }

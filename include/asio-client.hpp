@@ -23,7 +23,7 @@ struct TcpClientConnection : std::enable_shared_from_this<TcpClientConnection> {
                                              asio::io_context::strand &strand,
                                              Mp3Stream &mp3_stream);
 
-  void on_connect(asio::ip::tcp::endpoint endpoint);
+  void on_connect();
 
   asio::ip::tcp::socket &socket();
 

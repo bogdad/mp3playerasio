@@ -68,7 +68,7 @@ namespace am {
     s << "pid_" << pid << "_buffer_" << r;
     const auto shname = s.str();
     shm_unlink(shname.c_str());
-    int fd = shm_open(shname.c_str(), O_RDWR | O_CREAT);
+    int fd = shm_open(shname.c_str(), O_RDWR | O_CREAT, 0);
     shname_ = shname;
     std::size_t len = bytes;
     if (ftruncate(fd, len) == -1) {

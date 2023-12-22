@@ -5,11 +5,12 @@
 #include <asio/io_context.hpp>
 #include <cstddef>
 #include <exception>
-#include <sys/_types/_off_t.h>
 #include <sys/socket.h>
 
-#if defined(__LINUX__) || defined(__APPLE__)
-
+#if defined(__linux__)
+#  include <sys/sendfile.h>
+#elif defined(__linux__) || defined(__APPLE__)
+#  include <sys/_types/_off_t.h>
 #elif defined(_WIN32) || defined(_WIN64)
 #  include <handleapi.h>
 #  include <io.h>
@@ -52,8 +53,17 @@ void SendFile::call() {
 #if defined(__linux__) || defined(__APPLE__)
   std::size_t len = size_ - cur_;
   off_t res_len;
+#if defined(__APPLE)
   int res = sendfile(fileno(file_), socket_.lowest_layer().native_handle(),
                      cur_, &res_len, nullptr, 0);
+#elif defined(__linux__)
+  res_len = cur_;
+  int res = sendfile(socket_.lowest_layer().native_handle(), fileno(file_),
+                     &res_len, len);
+  
+#else
+  static_assert(false);
+#endif
   LOG(INFO) << "sent " << res_len;
   if (res == 0) {
     cur_ += res_len;

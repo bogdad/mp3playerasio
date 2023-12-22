@@ -20,7 +20,7 @@ endif()
 find_package(asio REQUIRED)
 find_package(absl REQUIRED)
 find_package(minimp3 REQUIRED)
-find_package(sdl2 REQUIRED)
+find_package(SDL2 REQUIRED)
 
 add_library(protocol src/protocol.cpp src/protocol-system.cpp)
 target_include_directories(protocol
