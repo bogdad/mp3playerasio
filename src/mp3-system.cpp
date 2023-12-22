@@ -56,11 +56,14 @@ void SendFile::call() {
 #if defined(__APPLE__)
   int res = sendfile(fileno(file_), socket_.lowest_layer().native_handle(),
                      cur_, &res_len, nullptr, 0);
+
 #elif defined(__linux__)
-  res_len = cur_;
-  int res = sendfile(socket_.lowest_layer().native_handle(), fileno(file_),
-                     &res_len, len);
-  
+  auto res = sendfile(socket_.lowest_layer().native_handle(), fileno(file_),
+                     nullptr, len);
+  if (res > 0) {
+  	res_len = res;
+	res = 0;
+  }
 #else
   static_assert(false);
 #endif
