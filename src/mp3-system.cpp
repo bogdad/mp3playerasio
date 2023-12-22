@@ -53,7 +53,7 @@ void SendFile::call() {
 #if defined(__linux__) || defined(__APPLE__)
   std::size_t len = size_ - cur_;
   off_t res_len;
-#if defined(__APPLE)
+#if defined(__APPLE__)
   int res = sendfile(fileno(file_), socket_.lowest_layer().native_handle(),
                      cur_, &res_len, nullptr, 0);
 #elif defined(__linux__)
