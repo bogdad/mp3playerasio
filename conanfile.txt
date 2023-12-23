@@ -9,3 +9,10 @@ sdl/2.28.5
 CMakeDeps
 CMakeToolchain
 
+[options]
+sdl*:x11=False
+sdl*:xvm=False
+sdl*:opengles=False
+sdl*:xinerama=False
+sdl*:opengl=False
+sdl*:xscrnsaver=False
