@@ -150,7 +150,7 @@ namespace am {
   }
   p1_[0] = 'x';
   if (p1_[0] != p2_[0]) {
-      return -1;
+    return -1;
   }
   len_ = len;
   res_ = 0;
