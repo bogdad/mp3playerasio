@@ -148,6 +148,10 @@ namespace am {
     // TODO: cleanup. its works as is because we are calling terminate on -1
     return -1;
   }
+  p1_[0] = 'x';
+  if (p1_[0] != p2_[0]) {
+      return -1;
+  }
   len_ = len;
   res_ = 0;
 #endif
