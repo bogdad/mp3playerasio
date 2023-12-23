@@ -137,19 +137,19 @@ namespace am {
                                alloc_size & 0xffffffffu, 0))) {
     return -1;
   }
-  if (!(_p1 = (char *)MapViewOfFileEx(_file_handle, FILE_MAP_ALL_ACCESS, 0, 0,
+  if (!(p1_ = (char *)MapViewOfFileEx(file_handle_, FILE_MAP_ALL_ACCESS, 0, 0,
                                       len, ptr))) {
     return -1;
   }
 
-  if (!(_p2 = (char *)MapViewOfFileEx(_file_handle, FILE_MAP_ALL_ACCESS, 0, 0,
+  if (!(p2_ = (char *)MapViewOfFileEx(file_handle_, FILE_MAP_ALL_ACCESS, 0, 0,
                                       len, (char *)ptr + len))) {
     // something went wrong - clean up
     // TODO: cleanup. its works as is because we are calling terminate on -1
     return -1;
   }
-  _len = len;
-  _res = 0;
+  len_ = len;
+  res_ = 0;
 #endif
     return 0;
   }
