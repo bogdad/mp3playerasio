@@ -5,7 +5,6 @@
 #include <asio/io_context.hpp>
 #include <cstddef>
 #include <exception>
-#include <sys/socket.h>
 
 #if defined(__linux__)
 #  include <sys/sendfile.h>
