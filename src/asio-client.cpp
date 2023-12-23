@@ -105,6 +105,7 @@ void TcpClientConnection::handle() {
 }
 
 void AsioClient::connect(std::string_view host) {
+
   resolver_.async_resolve(
       host, "8060", [this](const asio::error_code &, auto results) mutable {
         auto connection =

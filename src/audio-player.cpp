@@ -1,3 +1,4 @@
+#include "metrics.hpp"
 #include "protocol.hpp"
 #include <SDL_audio.h>
 #include <absl/functional/any_invocable.h>
@@ -6,6 +7,7 @@
 #include <asio/detail/atomic_count.hpp>
 #include <asio/io_context.hpp>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -103,6 +105,8 @@ struct Player {
   }
 
   void callback(std::uint8_t *stream, int len) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    callbacks_called_.fetch_add(1, std::memory_order_relaxed);
     auto audio_len = static_cast<int>(_output_buffer.buffer().ready_size());
     if (audio_len == 0) {
       stop();
@@ -110,13 +114,10 @@ struct Player {
     }
     std::memset(stream, 0, len);
     if (len > audio_len) {
-      underflows_++;
+      metric_underflows_.add(1);
     }
-    total_callbacks_++;
-    total_len_ += len;
-    total_len_count_++;
-    total_buff_size_ += audio_len;
-    total_buff_count_++;
+    metric_len_.add(len);
+    metric_output_buff_.add(audio_len);
 
     len = (len > audio_len ? audio_len : len);
     _output_buffer.buffer().memcpy_out(stream, len);
@@ -124,6 +125,8 @@ struct Player {
     if (_output_buffer.buffer().below_low_watermark()) {
       on_low_watermark_();
     }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    memtric_callback_micros_.add(std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count());
   }
   void start() {
     LOG(INFO) << "audo device started";
@@ -140,22 +143,21 @@ struct Player {
   Channel &buffer() { return _output_buffer; }
   bool started() { return started_; }
 
-  auto stats() const {
-    auto total = total_callbacks_.load(std::memory_order::relaxed);
-    auto underflow = underflows_.load(std::memory_order::relaxed);
-    auto total_len = total_len_.load(std::memory_order::relaxed);
-    auto total_len_count = total_len_count_.load(std::memory_order::relaxed);
-    auto total_buff_size = total_buff_size_.load(std::memory_order::relaxed);
-    auto total_buff_count = total_buff_count_.load(std::memory_order::relaxed);
-
-    auto res = std::make_tuple(total, underflow, total_len, total_len_count, total_buff_size, total_buff_count);
-    return res;
+  int callbacks_called() {
+    return callbacks_called_.load(std::memory_order_relaxed);
   }
   void reset_stat() {
-    total_len_ = 0;
-    total_len_count_ = 0;
-    total_buff_size_ = 0;
-    total_buff_count_ = 0;
+    metric_len_.reset();
+    metric_underflows_.reset();
+    metric_output_buff_.reset();
+    memtric_callback_micros_.reset();
+  }
+
+  void log_stat() {
+    LOG(INFO) << metric_underflows_;
+    LOG(INFO) << metric_len_;
+    LOG(INFO) << metric_output_buff_;
+    LOG(INFO) << memtric_callback_micros_;
   }
 private:
   Player(OnLowWatermark &&on_low_watermark)
@@ -179,12 +181,11 @@ private:
   Channel _output_buffer{};
   std::atomic_bool started_{false};
   OnLowWatermark on_low_watermark_;
-  std::atomic_int underflows_{};
-  std::atomic_int total_callbacks_ {};
-  std::atomic_int total_len_{};
-  std::atomic_int total_len_count_{};
-  std::atomic_long total_buff_size_{};
-  std::atomic_int total_buff_count_{};
+  std::atomic_int callbacks_called_{};
+  Metric<int> metric_underflows_ = Metric<int>::create_counter("underflows");
+  Metric<int> metric_len_ = Metric<int>::create_average("sdl callback stream len");
+  Metric<int> metric_output_buff_ = Metric<int>::create_average("output buff");
+  Metric<long> memtric_callback_micros_ = Metric<long>::create_average("callback_micros");
 };
 
 void my_audio_callback(void *userdata, std::uint8_t *stream, int len) {
@@ -218,15 +219,11 @@ struct Mp3Stream::Pimpl {
       return;
     }
     decoded_frames_ = 0;
-    auto stats = player_->stats();
-    auto &[total, underflow, total_len, total_len_count, total_buff_size, total_buff_count] = stats;
-    if (total - stats_last_total_ > 399) {
-      LOG(INFO) << "callback stats " << " total " << total << " underflow " << underflow << " " << 100*underflow / total << "%";
-      auto avg = total_len_count > 0 ? total_len / total_len_count : 0;
-      LOG(INFO) << "callback stats " << " total_len " << total_len << " total_len_count " << total_len_count << " average " << avg;
-      auto avg_buff = total_buff_count > 0 ? total_buff_size / total_buff_count : 0;
-      LOG(INFO) << "callback stats " << " total_buff_len " << total_buff_size << " total_len_count " << total_buff_count << " average " << avg_buff;
-      stats_last_total_ = total;
+    
+    auto callbacks_called = player_->callbacks_called();
+    if (callbacks_called - last_callbacks_called_ > 399) {
+      player_->log_stat();
+      last_callbacks_called_ = callbacks_called;
       player_->reset_stat();
     }
   }
@@ -294,7 +291,7 @@ struct Mp3Stream::Pimpl {
   std::unique_ptr<Player> player_;
   int decoded_frames_{};
   std::once_flag log_mp3_format_once_;
-  int stats_last_total_ {-100};
+  int last_callbacks_called_ {-100};
   bool waiting_for_play_ {false};
 };
 
