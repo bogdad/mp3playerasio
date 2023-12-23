@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: install dev dependencies ubuntu-latest
-      run: sudo apt update && sudo apt install -y libsdl2-dev
+      run: sudo apt update && sudo apt install -y libsdl2-dev libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev
       if: ${{ matrix.os == 'ubuntu-latest' }}
 
     - name: Get Conan
