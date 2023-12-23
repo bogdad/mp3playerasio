@@ -45,7 +45,7 @@ jobs:
     - name: Test
       # Build your program with the given configuration
       run: cd ${{github.workspace}}/build && ctest --output-on-failure
-      if: ${{ matrix.os == 'ubuntu-latest' }} || ${{ matrix.os == 'macos-12' }}
+      if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-12' }}
 
     - name: Test windows
       # Build your program with the given configuration
