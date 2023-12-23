@@ -24,3 +24,4 @@ sdl*:wayland=False
 sdl*:xcursor=False
 sdl*:sdl2main=False
 sdl*:libunwind=False
+pulseaudio*:with_x11=False
