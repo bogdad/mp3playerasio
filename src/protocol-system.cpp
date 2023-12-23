@@ -131,7 +131,7 @@ namespace am {
   }
   VirtualFree(ptr, 0, MEM_RELEASE);
 
-  if (!(_file_handle =
+  if (!(file_handle_ =
             CreateFileMappingA(INVALID_HANDLE_VALUE, 0, PAGE_READWRITE,
                                (unsigned long long)alloc_size >> 32,
                                alloc_size & 0xffffffffu, 0))) {
