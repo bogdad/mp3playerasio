@@ -62,6 +62,8 @@ void SendFile::call() {
   if (res > 0) {
   	res_len = res;
 	res = 0;
+  } else {
+        res_len=-1;
   }
 #else
   static_assert(false);
@@ -81,6 +83,10 @@ void SendFile::call() {
                            }
                            on_chunk_sent_(size_ - cur_, *this);
                          });
+      LOG(INFO) << "sendfile: would block, EAGAIN";
+    } else if (err == 104) {
+      LOG(INFO) << "sendfile: client conection problem";
+      on_chunk_sent_(0, *this);
     } else {
       LOG(ERROR) << "sendfile failed " << res << " errno " << err;
       std::terminate();

@@ -68,7 +68,7 @@ namespace am {
     const auto shname = s.str();
     shm_unlink(shname.c_str());
     int fd = shm_open(shname.c_str(), O_RDWR | O_CREAT, 0);
-    shname_ = shname;
+    shname_ = std::move(shname);
     std::size_t len = bytes;
     if (ftruncate(fd, len) == -1) {
       perror("ftruncate");

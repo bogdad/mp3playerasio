@@ -213,6 +213,7 @@ int main() {
       LOG(INFO) << "run one";
       io_context.run_one();
     }
+    LOG(INFO)<<"stopping";
   } catch (std::exception &e) {
     std::cerr << e.what() << std::endl;
   }
