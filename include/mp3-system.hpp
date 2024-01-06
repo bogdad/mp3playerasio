@@ -39,6 +39,7 @@ struct SendFile {
   SendFile(asio::io_context &io_context, asio::ip::tcp::socket &socket,
            std::FILE *file, std::size_t size, OnChunkSent &&on_chunk_sent);
   void call();
+
 private:
   asio::io_context &io_context_;
   asio::ip::tcp::socket &socket_;

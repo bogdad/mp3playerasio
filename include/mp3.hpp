@@ -29,6 +29,7 @@ struct Mp3 {
   bool send(asio::io_context &io_context, const asio::ip::tcp::socket &socket,
             OnChunkSent &&on_chunk_sent);
   void cancel();
+
 private:
   Mp3(fhandle fd, size_t size)
       : fd_(std::move(fd))

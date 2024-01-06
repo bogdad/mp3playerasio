@@ -55,8 +55,7 @@ public:
 
   static pointer create(asio::io_context &io_context) {
     LOG(INFO) << "creating file";
-    Mp3 file =
-        Mp3::create(fs::path("../inside-you-162760.mp3"));
+    Mp3 file = Mp3::create(fs::path("../inside-you-162760.mp3"));
 
     return {new TcpConnection(io_context, std::move(file)),
             [](TcpConnection *conn) { delete conn; }};
@@ -177,15 +176,15 @@ public:
     start_accept();
   }
   void cancel() {
-    LOG(INFO)<<"cancel called";
     acceptor_.cancel();
     acceptor_.close();
-    for(auto &weak_conn : connections_) {
+    for (auto &weak_conn : connections_) {
       if (auto conn = weak_conn.lock()) {
         conn->cancel();
       }
     }
   }
+
 private:
   void start_accept() {
     LOG(INFO) << "start accept";
@@ -193,12 +192,12 @@ private:
     acceptor_.async_accept(
         new_connection->socket(),
         [this, new_connection](const asio::error_code &error) {
-	  LOG(INFO) << "accepted " << error;
-	  if (error == asio::error::operation_aborted) {
-	    LOG(INFO) << "accepted aborted";
+          LOG(INFO) << "accepted " << error;
+          if (error == asio::error::operation_aborted) {
+            LOG(INFO) << "accepted aborted";
             return;
           }
-	  connections_.emplace_back(new_connection);
+          connections_.emplace_back(new_connection);
           this->handle_accept(new_connection, error);
         });
   }
@@ -227,10 +226,10 @@ int main() {
     asio::io_context::strand strand{io_context};
     asio::signal_set signals{io_context, SIGINT};
     TcpServer server(io_context);
-    signals.async_wait([&server,&strand](const asio::error_code ec, int signal) {
-      LOG(INFO) << "cac";
-      server.cancel();
-    });
+    signals.async_wait(
+        [&server, &strand](const asio::error_code ec, int signal) {
+          server.cancel();
+        });
     io_context.run();
     LOG(INFO)<<"stopping";
   } catch (std::exception &e) {

@@ -60,14 +60,14 @@ void SendFile::call() {
   auto res = sendfile(socket_.lowest_layer().native_handle(), fileno(file_),
                      nullptr, len);
   if (res >= 0) {
-  	res_len = res;
-	res = 0;
+    res_len = res;
+    res = 0;
   } else {
-        res_len=0;
+    res_len = 0;
   }
 #else
   static_assert(false);
-#endif
+#  endif
   if (res == 0) {
     LOG(INFO) << "sent " << res_len << " res was " << res;
     cur_ += res_len;
