@@ -102,6 +102,7 @@ namespace am {
       return -1;
     }
     len_ = len;
+    printf("xxx len %zu\n", len_);
     res_ = 0;
 #else
   // source https://gist.github.com/rygorous/3158316

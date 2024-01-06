@@ -33,4 +33,8 @@ bool Mp3::send(asio::io_context &io_context,
 
 size_t Mp3::size() const { return size_; }
 
+void Mp3::cancel() {
+  send_file_.reset();
+}
+
 } // namespace am

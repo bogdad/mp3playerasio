@@ -32,7 +32,7 @@ namespace am {
 
 struct DestructionSignaller {
   std::string name_;
-  DestructionSignaller(std::string&& name): name_(std::move(name)){}
+  DestructionSignaller(std::string&& name);
   DestructionSignaller(const DestructionSignaller&) = default;
   DestructionSignaller(DestructionSignaller&&) = default;
   ~DestructionSignaller();

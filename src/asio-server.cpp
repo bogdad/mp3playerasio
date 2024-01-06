@@ -56,7 +56,7 @@ public:
   static pointer create(asio::io_context &io_context) {
     LOG(INFO) << "creating file";
     Mp3 file =
-        Mp3::create(fs::path("../classical-triumphant-march-163852.mp3"));
+        Mp3::create(fs::path("../inside-you-162760.mp3"));
 
     return {new TcpConnection(io_context, std::move(file)),
             [](TcpConnection *conn) { delete conn; }};
@@ -67,6 +67,11 @@ public:
   void start() {
     asio::error_code ec;
     send_date();
+  }
+
+  void cancel() {
+    _socket.close();
+    _file.cancel();
   }
 
 private:
@@ -80,10 +85,10 @@ private:
             [this](buffers_2<std::string_view> msg) { on_message(msg); }) {}
 
   void send_date() {
-    _message = make_daytime_string();
+    auto message = make_daytime_string();
 
     auto ptr = shared_from_this();
-    _server_encoder.fill_time(_message, _write_buffer);
+    _server_encoder.fill_time(message, _write_buffer);
 
     send([ptr]() { ptr->send_mp3(); },
          [](const asio::error_code &) { LOG(ERROR) << "send date error"; });
@@ -151,7 +156,6 @@ private:
 
   asio::io_context &io_context_;
   tcp::socket _socket;
-  std::string _message;
   asio::streambuf _buff;
   char _delim = '\0';
   asio::steady_timer _timer;
@@ -172,13 +176,29 @@ public:
       , acceptor_(io_context, tcp::endpoint(tcp::v4(), 8060)) {
     start_accept();
   }
-
+  void cancel() {
+    LOG(INFO)<<"cancel called";
+    acceptor_.cancel();
+    acceptor_.close();
+    for(auto &weak_conn : connections_) {
+      if (auto conn = weak_conn.lock()) {
+        conn->cancel();
+      }
+    }
+  }
 private:
   void start_accept() {
+    LOG(INFO) << "start accept";
     TcpConnection::pointer new_connection = TcpConnection::create(io_context_);
     acceptor_.async_accept(
         new_connection->socket(),
         [this, new_connection](const asio::error_code &error) {
+	  LOG(INFO) << "accepted " << error;
+	  if (error == asio::error::operation_aborted) {
+	    LOG(INFO) << "accepted aborted";
+            return;
+          }
+	  connections_.emplace_back(new_connection);
           this->handle_accept(new_connection, error);
         });
   }
@@ -188,12 +208,13 @@ private:
     if (!error) {
       new_connection->start();
     }
-
     start_accept();
   }
 
   asio::io_context &io_context_;
   tcp::acceptor acceptor_;
+  std::vector<std::weak_ptr<TcpConnection>> connections_;
+  DestructionSignaller signaller_{"TcpServer"};
 };
 
 } // namespace am
@@ -201,18 +222,16 @@ private:
 int main() {
   using namespace am;
 
-  std::atomic_int should_stop = 0;
   try {
     asio::io_context io_context;
+    asio::io_context::strand strand{io_context};
     asio::signal_set signals{io_context, SIGINT};
-    signals.async_wait([&should_stop](const asio::error_code ec, int signal) {
-      should_stop = 1;
-    });
     TcpServer server(io_context);
-    while (!should_stop) {
-      LOG(INFO) << "run one";
-      io_context.run_one();
-    }
+    signals.async_wait([&server,&strand](const asio::error_code ec, int signal) {
+      LOG(INFO) << "cac";
+      server.cancel();
+    });
+    io_context.run();
     LOG(INFO)<<"stopping";
   } catch (std::exception &e) {
     std::cerr << e.what() << std::endl;

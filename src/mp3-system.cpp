@@ -59,22 +59,24 @@ void SendFile::call() {
 #elif defined(__linux__)
   auto res = sendfile(socket_.lowest_layer().native_handle(), fileno(file_),
                      nullptr, len);
-  if (res > 0) {
+  if (res >= 0) {
   	res_len = res;
 	res = 0;
   } else {
-        res_len=-1;
+        res_len=0;
   }
 #else
   static_assert(false);
 #endif
-  LOG(INFO) << "sent " << res_len;
   if (res == 0) {
+    LOG(INFO) << "sent " << res_len << " res was " << res;
     cur_ += res_len;
     on_chunk_sent_(size_ - cur_, *this);
   } else {
     int err = errno;
+    LOG(INFO) << "sent " << res_len << " res was " << res << "err was " << err;
     if (err == EAGAIN) {
+      LOG(INFO) << "sendfile: would block, EAGAIN";
       cur_ += res_len;
       socket_.async_wait(asio::ip::tcp::socket::wait_write,
                          [this](const asio::error_code &ec) {
@@ -83,7 +85,6 @@ void SendFile::call() {
                            }
                            on_chunk_sent_(size_ - cur_, *this);
                          });
-      LOG(INFO) << "sendfile: would block, EAGAIN";
     } else if (err == 104) {
       LOG(INFO) << "sendfile: client conection problem";
       on_chunk_sent_(0, *this);
