@@ -113,6 +113,7 @@ private:
                        inprogress.call();
                      } else {
                        ptr->_socket.close();
+                       ptr->_file.cancel();
                      }
                    })) {
     } else {

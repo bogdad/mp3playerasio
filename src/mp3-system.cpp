@@ -85,7 +85,10 @@ void SendFile::call() {
                            }
                            on_chunk_sent_(size_ - cur_, *this);
                          });
-    } else if (err == 104) {
+    } else if (err == 57) { // mac
+      LOG(INFO) << "sendfile: client conection problem";
+      on_chunk_sent_(0, *this);
+    } else if (err == 104) { // linux
       LOG(INFO) << "sendfile: client conection problem";
       on_chunk_sent_(0, *this);
     } else {
