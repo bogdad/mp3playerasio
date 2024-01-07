@@ -17,6 +17,10 @@ if(UBSAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=undefined")
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+
+
 find_package(asio REQUIRED)
 find_package(absl REQUIRED)
 find_package(minimp3 REQUIRED)

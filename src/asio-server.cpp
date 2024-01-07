@@ -64,13 +64,12 @@ public:
   tcp::socket &socket() { return _socket; }
 
   void start() {
-    asio::error_code ec;
     send_date();
   }
 
   void cancel() {
-    _socket.close();
     _file.cancel();
+    //_socket.cancel();
   }
 
 private:
@@ -110,10 +109,12 @@ private:
     if (_file.send(io_context_, _socket,
                    [ptr](std::size_t left, SendFile &inprogress) {
                      if (left > 0) {
-                       inprogress.call();
+                        LOG(INFO) << "sendfile: inprogress";
+                        inprogress.call();
                      } else {
-                       ptr->_socket.close();
-                       ptr->_file.cancel();
+                        LOG(INFO) << "sendfile: closing cancelling";
+                        ptr->_socket.close();
+                        ptr->_file.cancel();
                      }
                    })) {
     } else {
@@ -138,6 +139,9 @@ private:
                                continuation = std::move(continuation)](
                                   const asio::error_code &ec,
                                   const size_t bytes_transferred) mutable {
+          if (ec == asio::error::operation_aborted) {
+            return;
+          }
           LOG(INFO) << "server: sending send" << _write_buffer;
           if (ec) {
             _write_buffer.commit(bytes_transferred);
@@ -178,12 +182,11 @@ public:
   }
   void cancel() {
     acceptor_.cancel();
-    acceptor_.close();
-    for (auto &weak_conn : connections_) {
-      if (auto conn = weak_conn.lock()) {
-        conn->cancel();
-      }
-    }
+    //for (auto &weak_conn : connections_) {
+    //  if (auto conn = weak_conn.lock()) {
+    //    conn->cancel();
+    //  }
+    //}
   }
 
 private:

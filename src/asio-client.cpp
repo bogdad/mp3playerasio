@@ -35,7 +35,7 @@ TcpClientConnection::create(asio::io_context &io_context,
 
 void TcpClientConnection::on_connect() {
   auto ptr = shared_from_this();
-  receive([ptr = std::move(ptr), this](auto ec) {
+  receive([ptr = std::move(ptr)](auto ec) {
     if (ec == asio::error::eof) {
       LOG(INFO) << "client: server closed socket";
     }
@@ -52,7 +52,7 @@ TcpClientConnection::TcpClientConnection(asio::io_context &io_context,
     ,_socket(io_context)
     , mp3_stream_(mp3_stream)
     , _client_decoder(
-          [this](buffers_2<std::string_view> ts) {
+          [](buffers_2<std::string_view> ts) {
             for (auto sv : ts) {
               LOG(INFO) << "time " << sv;
             }
