@@ -1,6 +1,8 @@
 #pragma once
 
 #include "protocol-system.hpp"
+#include "util.hpp"
+
 #include <absl/functional/any_invocable.h>
 #include <absl/strings/str_format.h>
 #include <array>
@@ -29,14 +31,6 @@ server sends mp3 offset
  */
 
 namespace am {
-
-struct DestructionSignaller {
-  std::string name_;
-  DestructionSignaller(std::string &&name);
-  DestructionSignaller(const DestructionSignaller&) = default;
-  DestructionSignaller(DestructionSignaller&&) = default;
-  ~DestructionSignaller();
-};
 
 using mutable_buffers = std::vector<asio::mutable_buffer>;
 using const_buffers = std::vector<asio::const_buffer>;

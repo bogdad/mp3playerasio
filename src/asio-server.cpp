@@ -12,6 +12,7 @@
 #include <absl/base/casts.h>
 #include <absl/base/thread_annotations.h>
 #include <absl/log/log.h>
+#include <absl/strings/str_cat.h>
 #include <absl/strings/str_format.h>
 #include <asio.hpp>
 #include <asio/basic_streambuf.hpp>
@@ -20,12 +21,12 @@
 #include <asio/error.hpp>
 #include <asio/error_code.hpp>
 #include <asio/io_context.hpp>
+#include <asio/post.hpp>
 #include <asio/read.hpp>
 #include <asio/read_until.hpp>
 #include <asio/signal_set.hpp>
-#include <asio/steady_timer.hpp>
+#include <asio/strand.hpp>
 #include <asio/streambuf.hpp>
-#include <atomic>
 #include <ctime>
 #include <filesystem>
 #include <iostream>
@@ -34,6 +35,7 @@
 #include <string>
 #include <string_view>
 
+#include "util.hpp"
 #include "mp3.hpp"
 #include "protocol.hpp"
 #include "server-protocol.hpp"
@@ -53,12 +55,15 @@ public:
   static constexpr auto interval = asio::chrono::seconds(5);
   using pointer = std::shared_ptr<TcpConnection>;
 
-  static pointer create(asio::io_context &io_context) {
+  static pointer create(asio::io_context &io_context, asio::io_context::strand &strand) {
     LOG(INFO) << "creating file";
     Mp3 file = Mp3::create(fs::path("../inside-you-162760.mp3"));
 
-    return {new TcpConnection(io_context, std::move(file)),
-            [](TcpConnection *conn) { delete conn; }};
+    return {new TcpConnection(io_context, strand, std::move(file)),
+            [](TcpConnection *conn) {
+              LOG(INFO) << "deleting connection " << conn;
+              delete conn; 
+            }};
   }
 
   tcp::socket &socket() { return _socket; }
@@ -68,16 +73,26 @@ public:
   }
 
   void cancel() {
-    _file.cancel();
-    //_socket.cancel();
+    // file.cancel deletes the last owning pointer to TcpConnection
+    // meanwhile something is being posted on the io_context that needs connection to be alive
+    // todo: make it better
+    auto ptr = shared_from_this();
+    _file.precancel();
+    asio::post(strand_.wrap([ptr](){
+      auto ptr2 = ptr;
+      ptr->_file.cancel();
+      asio::post(ptr->strand_.wrap([ptr2](){
+        ptr2->_socket.cancel();
+      }));
+    }));
+    
   }
 
 private:
-  TcpConnection(asio::io_context &io_context, Mp3 &&file)
+  TcpConnection(asio::io_context &io_context, asio::io_context::strand &strand, Mp3 &&file)
       : io_context_(io_context)
+      , strand_(strand)
       , _socket(io_context)
-      , _timer(io_context)
-      , _buff(1024)
       , _file(std::move(file))
       , _server_decoder(
             [this](buffers_2<std::string_view> msg) { on_message(msg); }) {}
@@ -98,23 +113,22 @@ private:
     send(
         [ptr]() {
           LOG(INFO) << "server: sending mp3 envelope success";
-          ptr->send_mp3_inner(ptr);
+          ptr->send_mp3_inner();
         },
         [ptr](const asio::error_code &ec) {
           LOG(ERROR) << "sending mp3 failed " << ec;
         });
   }
-  void send_mp3_inner(const TcpConnection::pointer &ptr) {
+  void send_mp3_inner() {
     LOG(INFO) << "server: calling sendfile";
+    auto ptr = shared_from_this();
     if (_file.send(io_context_, _socket,
                    [ptr](std::size_t left, SendFile &inprogress) {
                      if (left > 0) {
-                        LOG(INFO) << "sendfile: inprogress";
                         inprogress.call();
                      } else {
-                        LOG(INFO) << "sendfile: closing cancelling";
-                        ptr->_socket.close();
-                        ptr->_file.cancel();
+                        // hack to make sure ptr has at least 2 use count
+                        ptr->clean_up(ptr);
                      }
                    })) {
     } else {
@@ -123,6 +137,11 @@ private:
       _socket.close();
     };
   }
+
+  void clean_up(TcpConnection::pointer ptr) {
+    _file.cancel(); // this clears one last shared ptr on the connection 
+    _socket.close();
+  };
 
   void on_message(buffers_2<std::string_view> msg) {
     for (auto part : msg) {
@@ -159,10 +178,9 @@ private:
   }
 
   asio::io_context &io_context_;
+  asio::io_context::strand &strand_;
   tcp::socket _socket;
-  asio::streambuf _buff;
   char _delim = '\0';
-  asio::steady_timer _timer;
   bool _was_timeout{false};
 
   Mp3 _file;
@@ -175,24 +193,26 @@ private:
 
 class TcpServer {
 public:
-  TcpServer(asio::io_context &io_context)
+  TcpServer(asio::io_context &io_context, asio::io_context::strand &strand)
       : io_context_(io_context)
+      , strand_(strand)
       , acceptor_(io_context, tcp::endpoint(tcp::v4(), 8060)) {
     start_accept();
   }
   void cancel() {
     acceptor_.cancel();
-    //for (auto &weak_conn : connections_) {
-    //  if (auto conn = weak_conn.lock()) {
-    //    conn->cancel();
-    //  }
-    //}
+    for (auto &weak_conn : connections_) {
+      if (auto conn = weak_conn.lock()) {
+        LOG(INFO) << "cancelling use count " << conn.use_count();
+        conn->cancel();
+      }
+    }
   }
 
 private:
   void start_accept() {
     LOG(INFO) << "start accept";
-    TcpConnection::pointer new_connection = TcpConnection::create(io_context_);
+    TcpConnection::pointer new_connection = TcpConnection::create(io_context_, strand_);
     acceptor_.async_accept(
         new_connection->socket(),
         [this, new_connection](const asio::error_code &error) {
@@ -215,6 +235,7 @@ private:
   }
 
   asio::io_context &io_context_;
+  asio::io_context::strand &strand_;
   tcp::acceptor acceptor_;
   std::vector<std::weak_ptr<TcpConnection>> connections_;
   DestructionSignaller signaller_{"TcpServer"};
@@ -229,7 +250,7 @@ int main() {
     asio::io_context io_context;
     asio::io_context::strand strand{io_context};
     asio::signal_set signals{io_context, SIGINT};
-    TcpServer server(io_context);
+    TcpServer server(io_context, strand);
     signals.async_wait(
         [&server, &strand](const asio::error_code ec, int signal) {
           server.cancel();

@@ -295,14 +295,6 @@ void Encoder::fill_envelope(Envelope envelope, RingBuffer &buff) {
   buff.memcpy_in(&envelope, sizeof(envelope));
 }
 
-DestructionSignaller::DestructionSignaller(std::string &&name)
-    : name_(std::move(name)) {
-  LOG(INFO) << "constructing " << name_;
-}
-
-DestructionSignaller::~DestructionSignaller() {
-  LOG(INFO) << "destroying " << name_;
-}
 
 static std::string make_daytime_string() {
   using namespace std; // For time_t, time and ctime;

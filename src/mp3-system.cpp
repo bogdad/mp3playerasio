@@ -29,18 +29,24 @@ SendFileWin::SendFileWin(SendFileWin &&other) noexcept
 }
 
 SendFileWin::~SendFileWin() {
-  LOG(INFO) << "~SendFileWin";
+  cancel();
+}
+
+void SendFileWin::cancel() {
   if (event_) {
-    LOG(INFO) << "~SendFileWin: cancel";
+    LOG(INFO) << "SendFileWin: cancel";
     event_->close();
-    LOG(INFO) << "/~SendFileWin: cancel";
+    event_.reset();
+    LOG(INFO) << "/SendFileWin: cancel";
   }
   if (overlapped_.hEvent != nullptr) {
-    LOG(INFO) << "~SendFileWin: CloseHandle";
+    LOG(INFO) << "SendFileWin: CloseHandle";
     CloseHandle(overlapped_.hEvent);
-    LOG(INFO) << "/~SendFileWin: CloseHandle";
+    overlapped_.hEvent = nullptr;
+    LOG(INFO) << "/SendFileWin: CloseHandle";
   }
 }
+
 #endif
 
 SendFile::SendFile(asio::io_context &io_context, asio::ip::tcp::socket &socket,
@@ -105,7 +111,7 @@ void SendFile::call() {
   }
 #elif defined(_WIN32) || defined(_WIN64)
   platform_.overlapped_ = {};
-  DWORD bytes = std::min(size_ - cur_, TRANSMITFILE_MAX);
+  DWORD bytes = std::min(std::min(size_ - cur_, TRANSMITFILE_MAX), 100000ull);
   auto socket = socket_.lowest_layer().native_handle();
   if (platform_.overlapped_.hEvent != nullptr) {
     CloseHandle(platform_.overlapped_.hEvent);
@@ -126,23 +132,22 @@ void SendFile::call() {
     } else if (error) {
       std::terminate();
     }
-    DWORD transferred;
-    GetOverlappedResult(platform_.overlapped_.hEvent, &platform_.overlapped_, &transferred,
-      FALSE);
-    DWORD err = GetLastError();
-    if (err) {
-      LOG(INFO) << "sendfile returned error " << err;
+    
+    std::size_t bytes_written = platform_.overlapped_.InternalHigh;
+    LOG(INFO) << "transmitfile: sent " <<bytes_written;
+    if (bytes_written == 0) {
+      // error
+      LOG(INFO) << "transmitfile error zero write";
       on_chunk_sent_(0, *this);
       return;
     }
-    std::size_t bytes_written = platform_.overlapped_.InternalHigh;
     cur_ += bytes_written;
-    if (cur_ < size_) {
+    if (cur_ <= size_) {
       on_chunk_sent_(size_ - cur_, *this);
     }
   });
   platform_.overlapped_.Offset = cur_ & 0x00000000FFFFFFFF;
-  ;
+
   platform_.overlapped_.OffsetHigh = (cur_ & 0xFFFFFFFF00000000) >> 32;
 
   auto fhandle = (HANDLE)_get_osfhandle(_fileno(file_));
@@ -158,6 +163,10 @@ void SendFile::call() {
     }
   }
 #endif
+}
+
+void SendFile::cancel() {
+  platform_.cancel();
 }
 
 } // namespace am

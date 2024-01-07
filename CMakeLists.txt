@@ -20,24 +20,32 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 
+if (WIN32)
+	set (CMAKE_SYSTEM_VERSION "10.0.17763.0")
+endif()
+
 
 find_package(asio REQUIRED)
 find_package(absl REQUIRED)
 find_package(minimp3 REQUIRED)
 find_package(SDL2 REQUIRED)
 
+add_library(util src/util.cpp)
+target_include_directories(util PUBLIC include)
+target_link_libraries(util PRIVATE absl::log)
+
 add_library(protocol src/protocol.cpp src/protocol-system.cpp)
 target_include_directories(protocol
 	PUBLIC include)
 target_link_libraries(protocol
-	PRIVATE absl::any_invocable
+	PRIVATE util absl::any_invocable
 	PUBLIC absl::base absl::log absl::core_headers asio::asio
 )
 
 add_library(mp3 src/mp3.cpp src/mp3-system.cpp)
 target_include_directories(mp3 PUBLIC include)
 target_link_libraries(mp3 
-	PRIVATE asio::asio absl::any_invocable absl::log)
+	PRIVATE util asio::asio absl::any_invocable absl::log)
 
 add_library(audio-player src/audio-player.cpp)
 target_include_directories(audio-player PUBLIC include)
@@ -49,13 +57,13 @@ add_library(asio-client
 target_include_directories(asio-client
 	PUBLIC include)
 target_link_libraries(asio-client 
-	PRIVATE protocol audio-player asio::asio absl::strings)
+	PRIVATE util protocol audio-player asio::asio absl::strings)
 
 add_executable(asio-server 
 	src/asio-server.cpp src/server-protocol.cpp)
 target_include_directories(asio-server PUBLIC include)
 target_link_libraries(asio-server
-	PRIVATE asio::asio absl::strings absl::log mp3 protocol)
+	PRIVATE util asio::asio absl::strings absl::log mp3 protocol)
 
 add_executable(driver src/driver.cpp)
 target_include_directories(driver PUBLIC include)

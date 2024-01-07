@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util.hpp"
 #include <absl/functional/any_invocable.h>
 #include <asio.hpp>
 #include <asio/ip/tcp.hpp>
@@ -17,7 +18,11 @@ namespace am {
 
 #if defined(__linux__) || defined(__APPLE__)
 
-struct SendFilePosix {};
+struct SendFilePosix {
+
+  void cancel(){}
+
+};
 #elif defined(_WIN32) || defined(_WIN64)
 struct SendFileWin {
   SendFileWin() = default;
@@ -27,8 +32,11 @@ struct SendFileWin {
   SendFileWin &operator=(SendFileWin &&other) = delete;
   ~SendFileWin();
 
+  void cancel();
+
   OVERLAPPED overlapped_{};
   std::unique_ptr<asio::windows::object_handle> event_{};
+  DestructionSignaller signaller_{"SendFileWin"};
 };
 #endif
 
@@ -39,7 +47,7 @@ struct SendFile {
   SendFile(asio::io_context &io_context, asio::ip::tcp::socket &socket,
            std::FILE *file, std::size_t size, OnChunkSent &&on_chunk_sent);
   void call();
-
+  void cancel();
 private:
   asio::io_context &io_context_;
   asio::ip::tcp::socket &socket_;
@@ -52,6 +60,7 @@ private:
 #elif defined(_WIN32) || defined(_WIN64)
   SendFileWin platform_{};
 #endif
+  DestructionSignaller sigaller_{"SendFile"};
 };
 
 } // namespace am

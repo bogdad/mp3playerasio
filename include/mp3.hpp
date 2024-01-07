@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mp3-system.hpp"
+#include "util.hpp"
 #include <absl/functional/any_invocable.h>
 #include <absl/log/log.h>
 #include <asio.hpp>
@@ -28,6 +29,7 @@ struct Mp3 {
   std::size_t size() const;
   bool send(asio::io_context &io_context, const asio::ip::tcp::socket &socket,
             OnChunkSent &&on_chunk_sent);
+  void precancel();
   void cancel();
 
 private:
@@ -38,7 +40,8 @@ private:
   fhandle fd_;
   std::size_t size_;
   bool _started{false};
-  std::optional<SendFile> send_file_{};
+  std::unique_ptr<SendFile> send_file_{};
+  DestructionSignaller signaller_{"Mp3"};
 };
 
 } // namespace am
