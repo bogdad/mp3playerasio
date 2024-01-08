@@ -78,12 +78,11 @@ public:
     // todo: make it better
     auto ptr = shared_from_this();
     _file.precancel();
-    asio::post(strand_.wrap([ptr](){
-      auto ptr2 = ptr;
-      ptr->_file.cancel();
-      asio::post(ptr->strand_.wrap([ptr2](){
-        ptr2->_socket.cancel();
-      }));
+    asio::post(ptr->strand_.wrap([ptr](){
+        ptr->_file.cancel();
+        asio::post(ptr->strand_.wrap([ptr](){
+          LOG(INFO) << ptr.use_count();
+        }));
     }));
     
   }
@@ -200,7 +199,7 @@ public:
     start_accept();
   }
   void cancel() {
-    acceptor_.cancel();
+    acceptor_.close();
     for (auto &weak_conn : connections_) {
       if (auto conn = weak_conn.lock()) {
         LOG(INFO) << "cancelling use count " << conn.use_count();

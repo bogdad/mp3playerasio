@@ -40,7 +40,7 @@ void Mp3::cancel() { if (send_file_) {
 } }
 
 void Mp3::precancel() { if (send_file_) { 
-  LOG(INFO) << "Mp3::cancel send file reset";
+  LOG(INFO) << "Mp3::cancel send file cancel";
   send_file_->cancel();
 } }
 
