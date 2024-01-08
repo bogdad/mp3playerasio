@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <cstdio>
 
-#if defined(__LINUX__) || defined(__APPLE__)
+#if defined(__linux__) || defined(__APPLE__)
 #  include <sys/types.h>
 #elif defined(_WIN32) || defined(_WIN64)
 #  include <asio/windows/object_handle.hpp>
@@ -19,9 +19,7 @@ namespace am {
 #if defined(__linux__) || defined(__APPLE__)
 
 struct SendFilePosix {
-
   void cancel(){}
-
 };
 #elif defined(_WIN32) || defined(_WIN64)
 struct SendFileWin {
@@ -55,7 +53,7 @@ private:
   std::size_t cur_;
   std::size_t size_;
   OnChunkSent on_chunk_sent_;
-#if defined(__LINUX__) || defined(__APPLE__)
+#if defined(__linux__) || defined(__APPLE__)
   SendFilePosix platform_{};
 #elif defined(_WIN32) || defined(_WIN64)
   SendFileWin platform_{};
